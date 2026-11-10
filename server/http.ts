@@ -8,6 +8,7 @@ import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
 import { events, memory, projects, reminders, tasks } from './db.ts';
 import { describeError, listModels } from './llm/index.ts';
+import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
 import { orch, runner, tick } from './orchestrator.ts';
 import {
@@ -317,6 +318,35 @@ app.post('/api/setup/adopt', async (c) => {
   }
   await pushSettings();
   return c.json({ ok: true });
+});
+
+// ---------- phone (Telegram) ----------
+
+app.put('/api/telegram', async (c) => {
+  const body = await c.req.json<{ token?: string; notify?: boolean }>();
+  if (typeof body.notify === 'boolean') telegram.setNotify(body.notify);
+  if (typeof body.token === 'string') {
+    const token = body.token.trim();
+    // A bot token looks like 123456789:AA…; catch a mis-paste before it becomes a confusing error.
+    if (!/^\d+:[\w-]{20,}$/.test(token)) return c.json({ error: 'That does not look like a bot token. BotFather gives you one shaped like 123456789:AAE…' }, 400);
+    telegram.setToken(token);
+  }
+  return c.json(telegram.status());
+});
+
+app.delete('/api/telegram', (c) => {
+  telegram.setToken(null);
+  return c.json(telegram.status());
+});
+
+app.post('/api/telegram/pair-code', (c) => {
+  telegram.newPairCode();
+  return c.json(telegram.status());
+});
+
+app.delete('/api/telegram/chats/:id', (c) => {
+  telegram.unpair(Number(c.req.param('id')));
+  return c.json(telegram.status());
 });
 
 app.all('/mcp', mcpEndpoint);

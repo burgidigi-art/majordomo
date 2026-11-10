@@ -55,6 +55,32 @@ fetched live from each account, so nothing is hard-coded to this month's model n
 
 Press **Test** / **Check sign-in** on an account card to confirm it works before relying on it.
 
+## Message it from your phone
+
+Majordomo can be reached through a Telegram bot, so you can start a project, ask where things stand, or approve a
+command while you are away from the computer.
+
+1. In Telegram, open a chat with **@BotFather**, send `/newbot`, and follow the prompts. It gives you a token.
+2. In Majordomo, go to **Settings → Phone**, paste the token, and press **Connect**.
+3. Open the pairing link shown there on any device signed in to your Telegram account and press **Start**.
+
+![The Phone panel in Settings, linked and ready](docs/phone.png)
+
+From then on, just write to the bot as you would at the desk. It is the same conversation: what you send from the
+phone shows up in the dashboard, marked *sent from Telegram*.
+
+- **Replies** to what you send from the phone always come back to the phone.
+- **Updates** the manager volunteers — work finished, a question for you — are pushed too, unless you turn off
+  *Send me updates on my phone*. Replies to things you typed at the dashboard stay at the dashboard.
+- **Approvals** (when shell commands are set to ask first) arrive with **Allow** / **Decline** buttons.
+- `/status` shows who is working without involving the manager; `/stop` halts it mid-reply; `/unlink` disconnects
+  the chat.
+
+The bot polls Telegram from your computer, so it needs no public address and answers only while Majordomo is
+running. Only chats linked with the one-time pairing code can use it; anyone else who finds the bot gets a refusal
+and never reaches the manager. Text messages only for now — no voice notes, photos or files. Messages pass through
+Telegram's servers, as with any bot.
+
 ## How it works
 
 ```
@@ -89,6 +115,7 @@ folder per project. A project can instead point at an existing folder, such as a
   to steer it mid-task, answer its question, or ask a finished agent for a follow-up. Stop or retry from there.
 - **Projects** — a board of each project's tasks, a browser for the files agents produced, and the goal and notes.
 - **Activity** — a timeline of every agent across all projects, with tokens and cost per account.
+- **Your phone** — the same manager over Telegram; see below.
 
 ## Safety
 
@@ -100,6 +127,8 @@ Agents run commands on your computer. Know what the guard rails are and are not:
   are limited to reading and editing files. Codex additionally runs in its own workspace sandbox by default.
 - The server listens on `127.0.0.1` only and refuses requests from other sites or hostnames. To reach it from another
   device, set `MAJORDOMO_HOST` **and** `MAJORDOMO_TOKEN`; it will not start on a network address without a token.
+- The Telegram bot only obeys chats you linked with the pairing code. Whoever holds your unlocked phone can direct
+  the manager and approve commands from it, so treat a linked chat like an open terminal.
 - Agents are told to stop and ask before spending money, sending messages, publishing, or deleting outside the
   workspace. That is an instruction to a model, not an enforcement mechanism.
 
@@ -127,6 +156,7 @@ server/
   agents/prompts.ts   the manager's and workers' instructions
   llm/                provider adapters: anthropic.ts, openai.ts (OpenAI, Gemini, Muse, OpenRouter), demo.ts
   tools/              pm.ts (manager tools), worker.ts (worker tools)
+  gateways/telegram.ts  the Telegram bot: polling, pairing, replies, approval buttons
   mcp.ts              serves the manager's tools to a CLI-hosted manager over MCP
   http.ts             REST + server-sent events + the built dashboard
 web/src/              React dashboard
@@ -134,7 +164,7 @@ shared/types.ts       types shared by both
 ```
 
 Environment variables: `MAJORDOMO_PORT` (4317), `MAJORDOMO_HOME`, `MAJORDOMO_HOST`, `MAJORDOMO_TOKEN`,
-`MAJORDOMO_DEMO=1`, and `MAJORDOMO_CLAUDE_BIN` / `MAJORDOMO_CODEX_BIN` / `MAJORDOMO_GEMINI_BIN` to point at a CLI
+`MAJORDOMO_DEMO=1`, `TELEGRAM_BOT_TOKEN` (instead of saving the token in Settings), and `MAJORDOMO_CLAUDE_BIN` / `MAJORDOMO_CODEX_BIN` / `MAJORDOMO_GEMINI_BIN` to point at a CLI
 that is not on your `PATH`.
 
 ## Status
@@ -148,7 +178,8 @@ What has been exercised, and how:
 | Claude API adapter | Tests against a mock of the Messages API — not yet against the live API |
 | OpenAI-compatible adapter (OpenAI, Gemini, Muse, OpenRouter) | Tests against a mock Chat Completions server — not yet against the live APIs |
 | Codex CLI and Gemini CLI drivers | Written against each CLI's documented flags and event format — not yet run signed-in |
+| Telegram gateway | Tests and a browser run against a mock of the Bot API — not yet against Telegram itself |
 
 Known limits: nothing survives a restart mid-run (running agents are marked *interrupted* and can be retried);
-switching the manager between a CLI and an API account starts a new conversation; there is no messaging gateway
-(Telegram, Slack, …) yet — the dashboard is the only way in.
+switching the manager between a CLI and an API account starts a new conversation; Telegram is the only messaging
+gateway, and it is text-only.

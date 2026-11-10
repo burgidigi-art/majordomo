@@ -160,6 +160,26 @@ export interface PmStatus {
   costUsd: number;
 }
 
+export interface TelegramChat {
+  id: number;
+  name: string;
+  pairedAt: number;
+}
+
+export interface TelegramStatus {
+  /** A bot token is saved (or set in the environment). */
+  configured: boolean;
+  /** The bot is polling Telegram for messages right now. */
+  connected: boolean;
+  botUsername: string;
+  error: string;
+  /** One-time code that links a Telegram chat to this Majordomo. */
+  pairCode: string;
+  chats: TelegramChat[];
+  /** Also push the manager's own updates (work finished, approvals needed), not just replies. */
+  notify: boolean;
+}
+
 export interface AppState {
   settings: Settings;
   runtimes: RuntimeInfo[];
@@ -169,6 +189,7 @@ export interface AppState {
   memory: Memory[];
   reminders: Reminder[];
   pm: PmStatus;
+  telegram: TelegramStatus;
   demo: boolean;
   version: string;
 }

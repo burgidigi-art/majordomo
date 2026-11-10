@@ -1,4 +1,4 @@
-import type { AgentEvent, AppState, FileEntry, ModelOption, Project, RuntimeId, Settings } from '../../shared/types.ts';
+import type { AgentEvent, AppState, FileEntry, ModelOption, Project, RuntimeId, Settings, TelegramStatus } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -46,6 +46,12 @@ export const api = {
   models: (runtime: RuntimeId) => request<ModelOption[]>(`/api/runtimes/${runtime}/models`),
   test: (runtime: RuntimeId) => post<{ ok: boolean; message: string }>(`/api/runtimes/${runtime}/test`),
   adopt: (runtime: RuntimeId, model: string) => post('/api/setup/adopt', { runtime, model }),
+
+  saveTelegram: (body: { token?: string; notify?: boolean }) =>
+    request<TelegramStatus>('/api/telegram', { method: 'PUT', body: JSON.stringify(body) }),
+  removeTelegram: () => request<TelegramStatus>('/api/telegram', { method: 'DELETE' }),
+  newPairCode: () => post<TelegramStatus>('/api/telegram/pair-code'),
+  unpairChat: (id: number) => request<TelegramStatus>(`/api/telegram/chats/${id}`, { method: 'DELETE' }),
 
   forget: (id: string) => request(`/api/memory/${id}`, { method: 'DELETE' }),
   cancelReminder: (id: string) => request(`/api/reminders/${id}`, { method: 'DELETE' }),

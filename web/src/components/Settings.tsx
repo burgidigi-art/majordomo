@@ -1,4 +1,4 @@
-import { Check, Loader2, Plus, Star, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT } from '../../../shared/types.ts';
 import { api } from '../api.ts';
@@ -189,6 +189,166 @@ function AccountCard({ rt, isPm }: { rt: RuntimeInfo; isPm: boolean }) {
   );
 }
 
+// ---------- phone ----------
+
+function CopyLine({ text, href }: { text: string; href?: string }) {
+  const copy = () => void navigator.clipboard.writeText(text).then(() => toast('Copied'), () => toast('Could not copy — select it by hand', true));
+  return (
+    <div className="copy-line">
+      {href ? (
+        <a className="mono" href={href} target="_blank" rel="noreferrer noopener">
+          {text}
+        </a>
+      ) : (
+        <span className="mono">{text}</span>
+      )}
+      <button className="icon-btn" aria-label="Copy" title="Copy" onClick={copy}>
+        <Copy size={14} />
+      </button>
+    </div>
+  );
+}
+
+function Phone() {
+  const tg = useStore((s) => s.app!.telegram);
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  const connect = async () => {
+    setBusy(true);
+    const ok = await attempt(() => api.saveTelegram({ token }));
+    setBusy(false);
+    if (ok) setToken('');
+  };
+  const disconnect = () => {
+    if (window.confirm('Disconnect the Telegram bot? Linked chats are forgotten and the token is removed from this computer.')) {
+      void attempt(() => api.removeTelegram(), 'Telegram disconnected');
+    }
+  };
+
+  const link = `https://t.me/${tg.botUsername}?start=${tg.pairCode}`;
+  const showLink = tg.connected && (tg.chats.length === 0 || linking);
+
+  return (
+    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="acct-top">
+        <span className="avatar fam-gemini">
+          <Smartphone size={15} />
+        </span>
+        <div className="grow">
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Telegram{tg.botUsername ? ` · @${tg.botUsername}` : ''}</h3>
+          <div className="hint">
+            {!tg.configured
+              ? 'Not set up'
+              : tg.error
+                ? 'Not connected'
+                : !tg.connected
+                  ? 'Connecting…'
+                  : tg.chats.length
+                    ? `Linked to ${tg.chats.map((c) => c.name).join(', ')}`
+                    : 'Bot connected — now link your phone'}
+          </div>
+        </div>
+        <span className={`pill ${tg.connected && tg.chats.length ? 'done' : tg.error ? 'failed' : ''}`}>
+          <span className="dot" />
+          {tg.connected && tg.chats.length ? 'Ready' : tg.error ? 'Problem' : tg.connected ? 'Waiting for your phone' : 'Off'}
+        </span>
+      </div>
+
+      {tg.error && <div className="callout bad">{tg.error}</div>}
+
+      {(!tg.configured || tg.error) && (
+        <>
+          {!tg.configured && (
+            <ol className="steps-list">
+              <li>
+                In Telegram, open a chat with <b>@BotFather</b> and send <span className="mono">/newbot</span>. Pick any name; this bot is yours alone.
+              </li>
+              <li>BotFather replies with a token. Paste it here.</li>
+            </ol>
+          )}
+          <div className="row">
+            <input
+              className="input mono"
+              type="password"
+              value={token}
+              placeholder={tg.configured ? 'Paste a new bot token' : '123456789:AAE…'}
+              aria-label="Telegram bot token"
+              autoComplete="off"
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && token.trim() && void connect()}
+            />
+            <button className="btn primary" disabled={!token.trim() || busy} onClick={() => void connect()}>
+              Connect
+            </button>
+          </div>
+        </>
+      )}
+
+      {showLink && (
+        <div className="field">
+          <label>Link your phone</label>
+          <span className="hint">
+            Open this link on any device signed in to your Telegram account and press <b>Start</b>. It works once; after that only the linked chat
+            can talk to the bot.
+          </span>
+          <CopyLine text={link} href={link} />
+          <span className="hint">
+            Or open @{tg.botUsername} and send <span className="mono">/start {tg.pairCode}</span>
+          </span>
+        </div>
+      )}
+
+      {tg.chats.length > 0 && (
+        <>
+          <div>
+            {tg.chats.map((c) => (
+              <div key={c.id} className="list-row" style={{ padding: '6px 0', alignItems: 'center' }}>
+                <span className="grow">
+                  {c.name} <span className="faint mono">· chat {c.id}</span>
+                </span>
+                <button className="btn ghost sm" onClick={() => void attempt(() => api.unpairChat(c.id), 'Chat unlinked')}>
+                  Unlink
+                </button>
+              </div>
+            ))}
+          </div>
+          <label className="switch">
+            <input type="checkbox" checked={tg.notify} onChange={(e) => void attempt(() => api.saveTelegram({ notify: e.target.checked }))} />
+            <span>
+              Send me updates on my phone
+              <div className="hint">
+                When on, the manager also messages you when work finishes or needs you, and command approvals arrive with Allow / Decline buttons. When
+                off, it only answers what you send from the phone.
+              </div>
+            </span>
+          </label>
+        </>
+      )}
+
+      {tg.configured && (
+        <div className="row">
+          {tg.connected && tg.chats.length > 0 && !linking && (
+            <button className="btn sm" onClick={() => setLinking(true)}>
+              Link another chat
+            </button>
+          )}
+          {showLink && (
+            <button className="btn ghost sm" onClick={() => void attempt(() => api.newPairCode(), 'New pairing link made; the old one no longer works')}>
+              Make a new link
+            </button>
+          )}
+          <span className="grow" />
+          <button className="btn ghost sm danger" onClick={disconnect}>
+            Disconnect bot
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 
 export function Settings() {
@@ -247,6 +407,15 @@ export function Settings() {
               <AccountCard key={rt.id} rt={rt} isPm={app.settings.pm.runtime === rt.id} />
             ))}
           </div>
+        </section>
+
+        <section className="section">
+          <h2>Phone</h2>
+          <p>
+            Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. The bot runs from this
+            computer, so it answers while Majordomo is running here.
+          </p>
+          <Phone />
         </section>
 
         <section className="section">

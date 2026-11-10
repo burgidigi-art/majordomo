@@ -14,6 +14,8 @@ export interface InboxItem {
   text: string;
   /** What the transcript shows, when that should differ (e.g. without the context block). */
   display?: string;
+  /** The channel a user message arrived on, when it was not the dashboard. */
+  via?: 'telegram';
 }
 
 export interface AgentSpec {
@@ -42,6 +44,8 @@ export interface RunnerHooks {
   host: Host;
   onStart(id: string): void;
   onFinish(id: string, outcome: Outcome): void;
+  /** Called with the final text of each turn and the messages that prompted it. */
+  onReply?(id: string, text: string, items: InboxItem[]): void;
   onUsage(id: string, usage: Usage, costUsd: number, included: boolean): void;
 }
 
@@ -118,11 +122,12 @@ export class Runner {
       while (this.queued(id)) {
         const spec = this.hooks.spec(id);
         const items = this.take(id);
-        for (const it of items) emit(id, 'user', { from: it.from, text: it.display ?? it.text });
+        for (const it of items) emit(id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via });
         text =
           runtimeDef(spec.runtime).kind === 'cli'
             ? await this.cliTurn(spec, items, signal)
             : await this.nativeTurn(spec, items, signal);
+        this.hooks.onReply?.(id, text, items);
       }
       return { ok: true, text };
     } catch (err) {
@@ -266,7 +271,11 @@ export class Runner {
       // Anything that arrived while the agent was working joins the conversation here,
       // after the tool results, so the history stays append-only.
       const late = this.take(spec.id);
-      for (const it of late) emit(spec.id, 'user', { from: it.from, text: it.display ?? it.text });
+      for (const it of late) {
+        emit(spec.id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via });
+        // A message folded in mid-turn is answered by this turn's reply, so it counts as a prompt for it.
+        items.push(it);
+      }
       push({ role: 'user', parts: [...outputs, ...late.map((i) => ({ type: 'text' as const, text: i.text }))] });
 
       if (res.usage.input > getSettings().compactAtTokens) msgs = await this.compact(spec, msgs, signal);

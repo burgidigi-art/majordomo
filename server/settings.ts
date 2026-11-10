@@ -20,7 +20,7 @@ const ENV_KEYS: Record<KeyedRuntime, string[]> = {
   openrouter: ['OPENROUTER_API_KEY'],
 };
 
-function readSecrets(): Partial<Record<KeyedRuntime, string>> {
+function readSecrets(): Partial<Record<KeyedRuntime | 'telegram', string>> {
   try {
     return JSON.parse(fs.readFileSync(SECRETS_FILE, 'utf8'));
   } catch {
@@ -44,6 +44,19 @@ export function getSecret(runtime: KeyedRuntime): { key: string; source: 'saved'
     if (v) return { key: v, source: 'env' };
   }
   return null;
+}
+
+/** The Telegram bot token lives beside the API keys: same file, same permissions. */
+export function getTelegramToken(): string | null {
+  return readSecrets().telegram || process.env.TELEGRAM_BOT_TOKEN || null;
+}
+
+export function setTelegramToken(token: string | null): void {
+  const all = readSecrets();
+  if (token) all.telegram = token.trim();
+  else delete all.telegram;
+  fs.writeFileSync(SECRETS_FILE, JSON.stringify(all, null, 2), { mode: 0o600 });
+  fs.chmodSync(SECRETS_FILE, 0o600);
 }
 
 export function isKeyedRuntime(id: string): id is KeyedRuntime {

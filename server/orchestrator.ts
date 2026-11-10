@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AppState, PmStatus, Project, Task } from '../shared/types.ts';
+import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
 import { emit, sync } from './bus.ts';
@@ -73,9 +74,12 @@ function nowLine(): string {
   return `${d.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} (${zone})`;
 }
 
-function contextBlock(full: boolean): string {
+function contextBlock(full: boolean, via?: InboxItem['via']): string {
   const s = getSettings();
   const lines = [`Now: ${nowLine()}`];
+  if (via === 'telegram') {
+    lines.push('Channel: this message came from the user’s phone, over Telegram. Reply briefly and in plain sentences; they are reading on a small screen.');
+  }
   if (full) {
     if (s.userName) lines.push(`User: ${s.userName}`);
     lines.push(
@@ -386,12 +390,49 @@ function onUsage(id: string, usage: Usage, costUsd: number, included: boolean): 
   });
 }
 
-export const runner = new Runner({ spec: specFor, host, onStart, onFinish, onUsage });
+function onReply(id: string, text: string, items: InboxItem[]): void {
+  if (id !== PM) return;
+  telegram.deliverReply(text, {
+    viaTelegram: items.some((i) => i.via === 'telegram'),
+    fromDashboard: items.some((i) => i.from === 'user' && !i.via),
+  });
+}
+
+/** What /status on the phone shows: who is working, and where each live project stands. */
+function statusText(): string {
+  const all = tasks.all();
+  const live = all.filter((t) => t.status === 'running' || t.status === 'waiting');
+  const queued = all.filter((t) => t.status === 'queued').length;
+  const lines = [
+    live.length
+      ? `**${live.length} agent${live.length === 1 ? '' : 's'} working**${queued ? `, ${queued} queued` : ''}`
+      : queued
+        ? `Nobody is working; ${queued} queued.`
+        : 'Nobody is working right now.',
+  ];
+  for (const t of live.slice(0, 8)) {
+    const note = t.statusLine ? ` — ${t.statusLine.slice(0, 80)}` : '';
+    lines.push(`- ${t.crewName}: ${t.title}${t.status === 'waiting' ? ' (waiting on an answer)' : ''}${note}`);
+  }
+  const active = projects.all().filter((p) => p.status === 'active');
+  if (active.length) {
+    lines.push('', '**Projects**');
+    for (const p of active.slice(0, 10)) {
+      const top = tasks.byProject(p.id).filter((t) => !t.parentId);
+      const done = top.filter((t) => t.status === 'done').length;
+      const failed = top.filter((t) => t.status === 'failed' || t.status === 'interrupted').length;
+      lines.push(`- ${p.name}: ${done}/${top.length} done${failed ? `, ${failed} failed` : ''}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+export const runner = new Runner({ spec: specFor, host, onStart, onFinish, onUsage, onReply });
 
 // ---------- the orchestrator API (used by PM tools and the HTTP layer) ----------
 
 export const orch: Orch & {
-  chat(text: string): void;
+  chat(text: string, via?: InboxItem['via']): void;
   /** The user stopped a task from the dashboard; the PM should know its plan changed. */
   userCancelled(id: string): void;
   stopPm(): void;
@@ -547,8 +588,8 @@ export const orch: Orch & {
     sync({ reminders: reminders.all() });
   },
 
-  chat(text) {
-    runner.send(PM, { from: 'user', text: `${contextBlock(true)}\n\n${text}`, display: text });
+  chat(text, via) {
+    runner.send(PM, { from: 'user', text: `${contextBlock(true, via)}\n\n${text}`, display: text, via });
     sync({ pm: pmStatus() });
   },
 
@@ -601,6 +642,7 @@ export const orch: Orch & {
       memory: memory.all(),
       reminders: reminders.all(),
       pm: pmStatus(),
+      telegram: telegram.status(),
       demo: DEMO || getSettings().pm.runtime === 'demo',
       version: VERSION,
     };
@@ -615,6 +657,18 @@ export const orch: Orch & {
       }
     }
     approvals.expireAll();
+    telegram.configure({
+      chat: (text) => orch.chat(text, 'telegram'),
+      stopPm: () => orch.stopPm(),
+      isPmBusy: () => runner.isBusy(PM) || runner.queued(PM) > 0,
+      statusText,
+      resolveApproval: (id, ok) => orch.resolveApproval(id, ok),
+      approvalHeading: (a) => {
+        const t = tasks.get(a.agentId);
+        return t ? `${t.crewName} wants to run a command — ${t.title}` : 'An agent wants to run a command';
+      },
+    });
+    telegram.start();
     setInterval(() => {
       const now = Date.now();
       for (const r of reminders.all()) {

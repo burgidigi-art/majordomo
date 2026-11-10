@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { DATA_DIR } from './db.ts';
 import { app } from './http.ts';
 import { orch, runner, setBaseUrl } from './orchestrator.ts';
+import { telegram } from './gateways/telegram.ts';
 import { DEMO, getSettings } from './settings.ts';
 
 const port = Number(process.env.MAJORDOMO_PORT || process.env.PORT || 4317);
@@ -33,6 +34,7 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     closing = true;
     console.log('\n  Stopping agents…');
     runner.stopAll();
+    telegram.stop();
     setTimeout(() => process.exit(0), 400);
   });
 }

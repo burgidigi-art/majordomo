@@ -37,7 +37,7 @@ interface Step {
 }
 
 type Item =
-  | { kind: 'user'; key: string; from: string; text: string }
+  | { kind: 'user'; key: string; from: string; text: string; via?: string }
   | { kind: 'text'; key: string; text: string }
   | { kind: 'thinking'; key: string; text: string }
   | { kind: 'steps'; key: string; steps: Step[] }
@@ -52,7 +52,7 @@ function group(events: AgentEvent[], closed: boolean): Item[] {
     const key = `e${e.id}`;
     switch (e.type) {
       case 'user':
-        items.push({ kind: 'user', key, from: e.data.from ?? 'user', text: String(e.data.text ?? '') });
+        items.push({ kind: 'user', key, from: e.data.from ?? 'user', text: String(e.data.text ?? ''), via: e.data.via });
         break;
       case 'text': {
         const text = String(e.data.text ?? '').trim();
@@ -273,6 +273,7 @@ export const Transcript = memo(function Transcript({
               return (
                 <div key={it.key} className="msg-user">
                   {it.text}
+                  {it.via === 'telegram' && <span className="via">sent from Telegram</span>}
                 </div>
               );
             }

@@ -695,6 +695,13 @@ a:hover {
   overflow-wrap: anywhere;
   font-size: 15px;
 }
+.msg-user .via {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-align: right;
+}
 .msg-pm {
   font-size: 15px;
   line-height: 1.62;
@@ -1786,6 +1793,42 @@ a:hover {
 .acct .msg.bad {
   color: var(--bad);
   background: var(--bad-soft);
+}
+.steps-list {
+  margin: 0;
+  padding-left: 1.25em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+.copy-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 4px 4px 10px;
+  min-width: 0;
+}
+.copy-line .mono {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.switch input {
+  margin-top: 3px;
+  accent-color: var(--accent);
 }
 .crew-row {
   display: grid;
