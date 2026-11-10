@@ -23,6 +23,9 @@ npm install
 npm start
 ```
 
+`npm start` builds the dashboard the first time, and again whenever its source has changed, so after updating
+(`git pull`, then `npm install`) the same command picks up the new version.
+
 Open <http://localhost:4317>. With no account connected you land on the **demo crew** — simulated agents driving the
 real harness — so you can look around first. Then go to **Settings → Accounts**, connect one, and press
 **Use for manager & crew**.
