@@ -4,7 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AppState, Attachment, PmStatus, Project, Task } from '../shared/types.ts';
 import { fileSize } from './inbox.ts';
+import { googleConnected, googleStatus } from './google.ts';
 import { getLimits } from './limits.ts';
+import { googleTools } from './tools/google.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -96,6 +98,13 @@ function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): s
     );
     const mem = memory.all().slice(-80);
     if (mem.length) lines.push('Memory:', ...mem.map((m) => `- ${m.id}: ${m.text}`));
+    const google = googleStatus();
+    if (google.connected) {
+      lines.push(
+        `Email and calendar: connected to ${google.email || 'the user’s Google account'}. You can search and read their mail and calendar and save drafts. ` +
+          'Nothing can be sent from here: a draft waits in Gmail for the user to send, so say so when you have written one.',
+      );
+    }
   }
   const live = projects
     .all()
@@ -341,7 +350,7 @@ function specFor(id: string): AgentSpec {
       effort: s.pm.effort,
       cwd: PM_DIR,
       system: PM_SYSTEM,
-      tools: pmTools(orch),
+      tools: [...pmTools(orch), ...googleTools()],
       mcp: cli ? { url: `${baseUrl}/mcp`, token: MCP_TOKEN } : undefined,
     };
   }
@@ -358,7 +367,9 @@ function specFor(id: string): AgentSpec {
     effort: t.effort,
     cwd: project.workspace,
     system: workerSystem({ crewName: t.crewName, cwd: project.workspace, helper: !!t.parentId }),
-    tools: workerTools({ canDelegate: !t.parentId }),
+    tools: [...workerTools({ canDelegate: !t.parentId }), ...googleTools()],
+    // Agents on a CLI account bring their own tools; email and calendar reach them over MCP.
+    mcp: runtimeDef(t.runtime).kind === 'cli' && googleConnected() ? { url: `${baseUrl}/mcp/google`, token: MCP_TOKEN } : undefined,
     cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace }),
   };
 }
@@ -682,6 +693,7 @@ export const orch: Orch & {
       pm: pmStatus(),
       telegram: telegram.status(),
       limits: getLimits(),
+      google: googleStatus(),
       demo: DEMO || getSettings().pm.runtime === 'demo',
       version: VERSION,
     };

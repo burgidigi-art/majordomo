@@ -1,4 +1,4 @@
-import type { AgentEvent, AppState, FileEntry, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { AgentEvent, AppState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -52,6 +52,10 @@ export const api = {
   removeTelegram: () => request<TelegramStatus>('/api/telegram', { method: 'DELETE' }),
   newPairCode: () => post<TelegramStatus>('/api/telegram/pair-code'),
   unpairChat: (id: number) => request<TelegramStatus>(`/api/telegram/chats/${id}`, { method: 'DELETE' }),
+
+  saveGoogleClient: (clientId: string, clientSecret: string) =>
+    request<GoogleStatus>('/api/google', { method: 'PUT', body: JSON.stringify({ clientId, clientSecret }) }),
+  disconnectGoogle: (forget: boolean) => request<GoogleStatus>(`/api/google${forget ? '?forget=1' : ''}`, { method: 'DELETE' }),
 
   forget: (id: string) => request(`/api/memory/${id}`, { method: 'DELETE' }),
   cancelReminder: (id: string) => request(`/api/reminders/${id}`, { method: 'DELETE' }),

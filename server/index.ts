@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { DATA_DIR } from './db.ts';
+import { setRedirectBase } from './google.ts';
 import { app } from './http.ts';
 import { orch, runner, setBaseUrl } from './orchestrator.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -17,6 +18,7 @@ if (hostname !== '127.0.0.1' && hostname !== 'localhost' && !process.env.MAJORDO
 }
 
 setBaseUrl(`http://127.0.0.1:${port}`);
+setRedirectBase(`http://127.0.0.1:${port}`);
 orch.boot();
 
 serve({ fetch: app.fetch, port, hostname }, () => {

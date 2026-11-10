@@ -1,4 +1,4 @@
-import { Check, Copy, Loader2, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Mail, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
 import { api } from '../api.ts';
@@ -441,6 +441,132 @@ function Phone() {
   );
 }
 
+// ---------- email and calendar ----------
+
+function Google() {
+  const g = useStore((s) => s.app!.google);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const ok = await attempt(() => api.saveGoogleClient(clientId, clientSecret), 'Saved. Now connect your account.');
+    setBusy(false);
+    if (ok) {
+      setClientId('');
+      setClientSecret('');
+      setEditing(false);
+    }
+  };
+  // Signing in happens at Google, in this tab; Google sends the browser back here when it is done.
+  const connect = () => {
+    window.location.href = '/api/google/connect';
+  };
+  const showSetup = !g.configured || editing;
+
+  return (
+    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="acct-top">
+        <span className="avatar fam-claude">
+          <Mail size={15} />
+        </span>
+        <div className="grow">
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Gmail and Google Calendar{g.connected && g.email ? ` · ${g.email}` : ''}</h3>
+          <div className="hint">{g.connected ? 'Read mail and calendar, save drafts. Nothing can be sent.' : g.configured ? 'Ready to connect' : 'Not set up'}</div>
+        </div>
+        <span className={`pill ${g.connected ? 'done' : g.error ? 'failed' : ''}`}>
+          <span className="dot" />
+          {g.connected ? 'Connected' : g.error ? 'Problem' : 'Off'}
+        </span>
+      </div>
+
+      {g.error && <div className="callout bad">{g.error}</div>}
+
+      {g.connected && (
+        <ul className="steps-list" style={{ listStyle: 'disc' }}>
+          <li>
+            <b>Can</b> search and read your mail, read your calendar, and save drafts for you to review.
+          </li>
+          <li>
+            <b>Cannot</b> send, delete or label mail, or create or change calendar events. A draft waits in your Gmail Drafts folder until you
+            send it yourself.
+          </li>
+          <li>
+            Google has no “drafts only” permission, so the sign-in you approved technically allows sending. Majordomo has no code path that sends,
+            and refuses the send request outright.
+          </li>
+          <li>Mail is written by other people. The manager is told to treat what it reads as information, never as instructions.</li>
+        </ul>
+      )}
+
+      {showSetup && (
+        <>
+          <ol className="steps-list">
+            <li>
+              Open <span className="mono">console.cloud.google.com</span> and create a project (any name).
+            </li>
+            <li>
+              Under <b>APIs &amp; Services → Library</b>, enable <b>Gmail API</b> and <b>Google Calendar API</b>.
+            </li>
+            <li>
+              Set up the <b>OAuth consent screen</b>: choose <b>External</b>, give it a name, and add your own address as a test user. To avoid
+              signing in again every week, <b>publish</b> it (“In production”) — you will see a one-time “unverified app” warning, which is expected
+              for an app only you use.
+            </li>
+            <li>
+              Under <b>Credentials</b>, create an <b>OAuth client ID</b> of type <b>Desktop app</b>, and paste its client ID and secret here.
+            </li>
+          </ol>
+          <div className="grid-2">
+            <input className="input mono" value={clientId} placeholder="Client ID  (…apps.googleusercontent.com)" aria-label="Google client ID" autoComplete="off" spellCheck={false} onChange={(e) => setClientId(e.target.value)} />
+            <input className="input mono" type="password" value={clientSecret} placeholder="Client secret" aria-label="Google client secret" autoComplete="off" onChange={(e) => setClientSecret(e.target.value)} />
+          </div>
+          <div className="row">
+            <button className="btn primary" disabled={!clientId.trim() || !clientSecret.trim() || busy} onClick={() => void save()}>
+              Save
+            </button>
+            {editing && (
+              <button className="btn ghost" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {g.configured && !editing && (
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          {!g.connected && (
+            <button className="btn primary" onClick={connect}>
+              Connect Google account
+            </button>
+          )}
+          {g.connected && (
+            <button className="btn sm" onClick={connect}>
+              Sign in again
+            </button>
+          )}
+          <button className="btn ghost sm" onClick={() => setEditing(true)}>
+            Change client ID
+          </button>
+          <span className="grow" />
+          {g.connected ? (
+            <button className="btn ghost sm danger" onClick={() => window.confirm('Disconnect Gmail and Calendar? The manager will no longer be able to read them.') && void attempt(() => api.disconnectGoogle(false), 'Google disconnected')}>
+              Disconnect
+            </button>
+          ) : (
+            <button className="btn ghost sm danger" onClick={() => void attempt(() => api.disconnectGoogle(true), 'Removed')}>
+              Remove client ID
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 
 export function Settings({ section }: { section?: string }) {
@@ -513,6 +639,15 @@ export function Settings({ section }: { section?: string }) {
             here.
           </p>
           <Phone />
+        </section>
+
+        <section className="section" id="google">
+          <h2>Email &amp; calendar</h2>
+          <p>
+            Let the manager read your Gmail and Google Calendar and prepare drafts: “what needs a reply today?”, “draft an answer to Ana”, “what’s on
+            tomorrow?”. It can read and draft only.
+          </p>
+          <Google />
         </section>
 
         <section className="section" id="manager">

@@ -59,6 +59,27 @@ export function setTelegramToken(token: string | null): void {
   fs.chmodSync(SECRETS_FILE, 0o600);
 }
 
+/** The Google OAuth client and sign-in, kept with the other secrets. */
+export interface GoogleSecrets {
+  clientId: string;
+  clientSecret: string;
+  refreshToken?: string;
+  email?: string;
+}
+
+export function getGoogleSecrets(): GoogleSecrets | null {
+  const g = (readSecrets() as Record<string, unknown>).google;
+  return g && typeof g === 'object' && typeof (g as GoogleSecrets).clientId === 'string' ? (g as GoogleSecrets) : null;
+}
+
+export function setGoogleSecrets(next: GoogleSecrets | null): void {
+  const all = readSecrets() as Record<string, unknown>;
+  if (next) all.google = next;
+  else delete all.google;
+  fs.writeFileSync(SECRETS_FILE, JSON.stringify(all, null, 2), { mode: 0o600 });
+  fs.chmodSync(SECRETS_FILE, 0o600);
+}
+
 export function isKeyedRuntime(id: string): id is KeyedRuntime {
   return id in ENV_KEYS;
 }

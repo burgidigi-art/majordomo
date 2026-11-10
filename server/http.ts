@@ -7,6 +7,7 @@ import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMe
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
 import { events, memory, projects, reminders, tasks } from './db.ts';
+import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient, startSignIn } from './google.ts';
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -33,7 +34,7 @@ export const app = new Hono();
 
 app.use('*', async (c, next) => {
   const url = new URL(c.req.url);
-  if (url.pathname === '/mcp') return next();
+  if (url.pathname === '/mcp' || url.pathname === '/mcp/google') return next();
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
@@ -370,7 +371,30 @@ app.delete('/api/telegram/chats/:id', (c) => {
   return c.json(telegram.status());
 });
 
+// ---------- email and calendar (Google) ----------
+
+app.put('/api/google', async (c) => {
+  const { clientId, clientSecret } = await c.req.json<{ clientId?: string; clientSecret?: string }>();
+  saveClient(clientId ?? '', clientSecret ?? '');
+  return c.json(googleStatus());
+});
+
+/** Send the browser to Google to sign in. */
+app.get('/api/google/connect', (c) => c.redirect(startSignIn()));
+
+/** Google sends the browser back here with a one-time code. */
+app.get('/api/google/callback', async (c) => {
+  await finishSignIn({ code: c.req.query('code'), state: c.req.query('state'), error: c.req.query('error') });
+  return c.redirect('/#/settings/google');
+});
+
+app.delete('/api/google', async (c) => {
+  await disconnectGoogle(c.req.query('forget') === '1');
+  return c.json(googleStatus());
+});
+
 app.all('/mcp', mcpEndpoint);
+app.all('/mcp/google', mcpEndpoint);
 
 // ---------- the built dashboard ----------
 

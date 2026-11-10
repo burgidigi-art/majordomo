@@ -84,7 +84,8 @@ const claude: Driver = {
     } else {
       const ask = getSettings().approvalMode === 'ask';
       args.push('--permission-mode', 'acceptEdits');
-      args.push('--allowedTools', ask ? 'Read,Glob,Grep,WebFetch,WebSearch' : 'Bash,Read,Glob,Grep,WebFetch,WebSearch');
+      const own = ask ? 'Read,Glob,Grep,WebFetch,WebSearch' : 'Bash,Read,Glob,Grep,WebFetch,WebSearch';
+      args.push('--allowedTools', turn.mcp ? `${own},mcp__majordomo` : own);
     }
     if (turn.mcp) {
       const config = {
@@ -92,7 +93,9 @@ const claude: Driver = {
           majordomo: { type: 'http', url: turn.mcp.url, headers: { Authorization: `Bearer ${turn.mcp.token}` } },
         },
       };
-      args.push('--mcp-config', JSON.stringify(config), '--strict-mcp-config');
+      args.push('--mcp-config', JSON.stringify(config));
+      // The manager works only through the harness. A worker keeps whatever else the user has set up.
+      if (turn.manager) args.push('--strict-mcp-config');
     }
     return { args, stdin: turn.prompt };
   },
@@ -262,8 +265,9 @@ const gemini: Driver = {
     if (session) args.push('--resume', session);
     else args.push('--session-id', (session = randomUUID()));
     args.push('--approval-mode', turn.manager ? 'default' : getSettings().approvalMode === 'ask' ? 'auto_edit' : 'yolo');
-    if (turn.mcp) {
-      // Gemini CLI reads MCP servers from the project's .gemini/settings.json.
+    if (turn.mcp && turn.manager) {
+      // Gemini CLI reads MCP servers from the project's .gemini/settings.json. Only the manager's own
+      // folder gets one: writing a token into a project workspace is not worth it for a worker.
       const dir = path.join(turn.cwd, '.gemini');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(

@@ -5,6 +5,7 @@ import {
   FolderKanban,
   KeyRound,
   LayoutDashboard,
+  Mail,
   MessageSquareText,
   PanelRight,
   Settings as SettingsIcon,
@@ -147,6 +148,13 @@ export function App() {
             label="Phone"
             active={section === 'settings' && settingsPart === 'phone'}
             count={app.telegram.connected && app.telegram.chats.length ? 'on' : undefined}
+          />
+          <NavLink
+            href="#/settings/google"
+            icon={Mail}
+            label="Email"
+            active={section === 'settings' && settingsPart === 'google'}
+            count={app.google.connected ? 'on' : undefined}
           />
         </div>
 

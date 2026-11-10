@@ -210,6 +210,16 @@ export interface TelegramStatus {
   voice: VoiceStatus;
 }
 
+export interface GoogleStatus {
+  /** An OAuth client ID and secret are saved. */
+  configured: boolean;
+  /** The user has signed in and a long-lived sign-in is stored. */
+  connected: boolean;
+  /** The Gmail address that is connected. */
+  email: string;
+  error: string;
+}
+
 /** How much of a subscription's allowance is used, as a fraction from 0 to 1. */
 export interface AccountLimits {
   weekly?: { used: number; resetsAt: number };
@@ -230,6 +240,7 @@ export interface AppState {
   pm: PmStatus;
   telegram: TelegramStatus;
   limits: Partial<Record<RuntimeId, AccountLimits>>;
+  google: GoogleStatus;
   demo: boolean;
   version: string;
 }

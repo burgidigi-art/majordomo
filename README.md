@@ -120,6 +120,47 @@ In the dashboard, photos show as thumbnails in the chat and other files as downl
 bots can fetch files up to 20 MB and send files up to 50 MB. Pictures over about 4.5 MB are kept as files but not
 shown to a model directly. Nothing in the inbox is deleted automatically.
 
+## Email and calendar
+
+Connect a Google account and the manager can read your Gmail and Google Calendar and prepare drafts: *"what needs
+a reply today?"*, *"draft an answer to Ana confirming Thursday"*, *"what's on tomorrow?"*. It is read and draft
+only.
+
+![The Email & calendar panel, connected](docs/email.png)
+
+| It can | It cannot |
+| --- | --- |
+| Search and read your mail | Send mail |
+| Read your calendar | Delete, archive or label mail |
+| Save a draft, including a reply in an existing conversation | Create or change calendar events |
+
+A draft waits in your Gmail Drafts folder until you send it yourself.
+
+**Setting it up** takes about ten minutes, once, because Google requires you to register your own "app":
+
+1. At `console.cloud.google.com`, create a project.
+2. Under **APIs & Services → Library**, enable **Gmail API** and **Google Calendar API**.
+3. Set up the **OAuth consent screen**: choose **External**, name it, and add your own address as a test user.
+   Publish it ("In production") or Google will make you sign in again every week; you will see a one-time
+   "unverified app" warning, which is expected for an app only you use.
+4. Under **Credentials**, create an **OAuth client ID** of type **Desktop app**.
+5. In Majordomo, go to **Settings → Email & calendar**, paste the client ID and secret, and press
+   **Connect Google account**.
+
+Two things worth knowing:
+
+- **"Draft only" is enforced by Majordomo, not by Google.** Google has no drafts-only permission: the one that
+  allows saving a draft also allows sending. Majordomo has no send tool, a single module talks to Gmail, and that
+  module refuses the send endpoints outright. But the sign-in stored on your computer could technically send if
+  other software used it, so treat `~/.majordomo/secrets.json` as you would a password.
+- **Mail is written by strangers.** Everything read from an email or calendar event is handed to the model fenced
+  off and labelled as someone else's words, and the manager is told never to act on instructions found inside.
+  That lowers the risk of a malicious email steering an agent; it does not remove it. If that concerns you, set
+  shell commands to *Ask first*.
+
+The manager has these tools on any account. Agents working for it have them on API accounts and on a Claude
+subscription; Codex and Gemini CLI agents do not yet.
+
 ## How it works
 
 ```
@@ -163,6 +204,7 @@ files you send in, and one workspace folder per project. A project can instead p
 - **Projects** — a board of each project's tasks, a browser for the files agents produced, and the goal and notes.
 - **Activity** — a timeline of every agent across all projects, with tokens and cost per account.
 - **Memory** — what the manager has saved about you, and the reminders it has set for itself.
+- **Email and calendar** — read-and-draft access to Gmail and Google Calendar; see below.
 - **Your phone** — the same manager over Telegram; see below.
 
 ![Chat with the manager, with the live crew alongside](docs/desk.png)
@@ -213,6 +255,8 @@ server/
   gateways/telegram.ts  the Telegram bot: polling, pairing, replies, approval buttons, voice notes
   gateways/transcribe.ts  speech-to-text for voice notes: OpenAI, Gemini, or a local command
   inbox.ts            where photos and files sent in from the phone are kept
+  google.ts           Gmail and Calendar: sign-in, read, and draft — the only code that talks to Google
+  tools/google.ts     the email and calendar tools the manager and agents get
   mcp.ts              serves the manager's tools to a CLI-hosted manager over MCP
   limits.ts           plan usage as reported by the subscription CLIs (feeds the usage orbs)
   http.ts             REST + server-sent events + the built dashboard
@@ -237,6 +281,7 @@ What has been exercised, and how:
 | Codex CLI and Gemini CLI drivers | Written against each CLI's documented flags and event format — not yet run signed-in |
 | Telegram gateway | Tests and a browser run against a mock of the Bot API — not yet against Telegram itself |
 | Photos and files | Tests against a mock of the Bot API and of both model APIs, a browser run, and one real run: a photo read correctly by the manager on a Claude subscription. Sending files back is mock-tested only |
+| Email and calendar | Tests against a mock of Google's sign-in, Gmail and Calendar, a browser run of the setup, and a real run with the manager and a worker on a Claude subscription using the tools against that mock. Not yet against a real Google account |
 | Voice notes | Tests against mocks of Telegram, OpenAI and Gemini, with real Ogg/Opus audio through `ffmpeg` and a real local command — not yet against the live services |
 
 Known limits: nothing survives a restart mid-run (running agents are marked *interrupted* and can be retried);
