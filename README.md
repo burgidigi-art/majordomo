@@ -78,8 +78,8 @@ phone shows up in the dashboard, marked *sent from Telegram*.
 
 The bot polls Telegram from your computer, so it needs no public address and answers only while Majordomo is
 running. Only chats linked with the one-time pairing code can use it; anyone else who finds the bot gets a refusal
-and never reaches the manager. Text and voice notes work; photos, videos and files do not yet. Messages pass
-through Telegram's servers, as with any bot.
+and never reaches the manager. Text, voice notes, photos and files all work. Messages pass through Telegram's
+servers, as with any bot.
 
 ### Voice notes
 
@@ -99,6 +99,24 @@ Claude has no speech-to-text, so transcription needs one of these (Settings → 
 recording (Ogg/Opus) should go, for example `my-transcriber {file}`; only what the command prints to standard
 output is used. Telegram lets bots fetch recordings up to 20 MB.
 
+### Photos and files
+
+Send the bot a photo or a file, with or without a caption, and it is saved to `~/.majordomo/inbox` on your computer
+and announced to the manager. Several photos sent together arrive as one message.
+
+- **The manager can look at photos** — a whiteboard, a receipt, a screenshot of an error — and act on what it sees.
+  On an API account the picture is attached to the message; on a CLI account the manager opens the saved file.
+- **To put a file to work**, the manager copies it from the inbox into a project (`attachments/` in that project's
+  workspace) and points the agent at it. Agents on an API account get a `view_image` tool for pictures.
+- **Files come back too.** Ask for a deliverable — "send me the report" — and the manager sends it to your phone:
+  images as photos, everything else as a document.
+
+![A photo and a PDF sent from Telegram, as they appear at the desk](docs/phone-files.png)
+
+In the dashboard, photos show as thumbnails in the chat and other files as download chips. Limits are Telegram's:
+bots can fetch files up to 20 MB and send files up to 50 MB. Pictures over about 4.5 MB are kept as files but not
+shown to a model directly. Nothing in the inbox is deleted automatically.
+
 ## How it works
 
 ```
@@ -113,7 +131,7 @@ output is used. Telegram lets bots fetch recordings up to 20 MB.
   what agents produced so it can verify before reporting. It does not do the work itself.
 - **Tasks** start automatically, in parallel up to a limit you set. `depends_on` sequences them, and a dependent task
   is handed the reports of the tasks before it.
-- **Workers** get a shell, file tools, search, web fetch (plus Claude's web search on Claude models), and three ways to
+- **Workers** get a shell, file tools, search, image viewing, web fetch (plus Claude's web search on Claude models), and three ways to
   talk upward: `report_progress`, `ask_manager` (blocks until answered), and `delegate` (parallel helper agents).
 - **Events** flow back to the manager, batched: a finished task wakes it, it decides what happens next, and it only
   speaks to you when there is something worth your attention.
@@ -122,8 +140,8 @@ output is used. Telegram lets bots fetch recordings up to 20 MB.
 - **Memory**: the manager saves lasting facts about you (`remember`), keeps a running brief per project, and can set
   reminders to wake itself up later. Long conversations are summarised automatically before they overflow.
 
-Everything lives in `~/.majordomo` (override with `MAJORDOMO_HOME`): a SQLite database, your keys, and one workspace
-folder per project. A project can instead point at an existing folder, such as a repo.
+Everything lives in `~/.majordomo` (override with `MAJORDOMO_HOME`): a SQLite database, your keys, an inbox for
+files you send in, and one workspace folder per project. A project can instead point at an existing folder, such as a repo.
 
 ## What you can see and do
 
@@ -147,6 +165,8 @@ Agents run commands on your computer. Know what the guard rails are and are not:
   device, set `MAJORDOMO_HOST` **and** `MAJORDOMO_TOKEN`; it will not start on a network address without a token.
 - The Telegram bot only obeys chats you linked with the pairing code. Whoever holds your unlocked phone can direct
   the manager and approve commands from it, so treat a linked chat like an open terminal.
+- Files sent to the bot are stored as-is and never run. Their names are stripped down to a plain file name, and the
+  dashboard only ever displays the images; everything else is download-only.
 - Agents are told to stop and ask before spending money, sending messages, publishing, or deleting outside the
   workspace. That is an instruction to a model, not an enforcement mechanism.
 
@@ -176,6 +196,7 @@ server/
   tools/              pm.ts (manager tools), worker.ts (worker tools)
   gateways/telegram.ts  the Telegram bot: polling, pairing, replies, approval buttons, voice notes
   gateways/transcribe.ts  speech-to-text for voice notes: OpenAI, Gemini, or a local command
+  inbox.ts            where photos and files sent in from the phone are kept
   mcp.ts              serves the manager's tools to a CLI-hosted manager over MCP
   http.ts             REST + server-sent events + the built dashboard
 web/src/              React dashboard
@@ -198,8 +219,10 @@ What has been exercised, and how:
 | OpenAI-compatible adapter (OpenAI, Gemini, Muse, OpenRouter) | Tests against a mock Chat Completions server — not yet against the live APIs |
 | Codex CLI and Gemini CLI drivers | Written against each CLI's documented flags and event format — not yet run signed-in |
 | Telegram gateway | Tests and a browser run against a mock of the Bot API — not yet against Telegram itself |
+| Photos and files | Tests against a mock of the Bot API and of both model APIs, a browser run, and one real run: a photo read correctly by the manager on a Claude subscription. Sending files back is mock-tested only |
 | Voice notes | Tests against mocks of Telegram, OpenAI and Gemini, with real Ogg/Opus audio through `ffmpeg` and a real local command — not yet against the live services |
 
 Known limits: nothing survives a restart mid-run (running agents are marked *interrupted* and can be retried);
 switching the manager between a CLI and an API account starts a new conversation; Telegram is the only messaging
-gateway, and it takes text and voice notes only; the manager always replies in text.
+gateway; the manager replies in text and can send files, but not voice; files can only be attached from the
+phone, not from the dashboard.

@@ -7,6 +7,7 @@ import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMe
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
 import { events, memory, projects, reminders, tasks } from './db.ts';
+import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
@@ -207,6 +208,24 @@ app.get('/api/projects/:id/file', async (c) => {
   const buf = await fs.readFile(file);
   if (buf.subarray(0, 4096).includes(0)) return c.json({ content: '', size: stat.size, note: 'Binary file — no preview.' });
   return c.json({ content: buf.toString('utf8'), size: stat.size });
+});
+
+// ---------- files the user sent in ----------
+
+app.get('/api/inbox/:name', async (c) => {
+  const file = await inboxFile(c.req.param('name'));
+  if (!file) return c.json({ error: 'No such file.' }, 404);
+  const mime = mimeOf(file);
+  const body = await fs.readFile(file);
+  // Only plain images are shown in the page; anything else is offered as a download, never rendered,
+  // so a file sent in from outside can't run as script on the dashboard's origin.
+  const inline = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mime);
+  return c.body(body, 200, {
+    'Content-Type': inline ? mime : 'application/octet-stream',
+    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${path.basename(file).replace(/[^\w.-]/g, '_')}"`,
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'private, max-age=3600',
+  });
 });
 
 // ---------- settings, accounts, models ----------

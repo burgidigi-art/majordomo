@@ -695,6 +695,52 @@ a:hover {
   overflow-wrap: anywhere;
   font-size: 15px;
 }
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  white-space: normal;
+}
+.attachments:not(:last-child) {
+  margin-bottom: 8px;
+}
+.attachments .thumb {
+  display: block;
+  line-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+.attachments .thumb img {
+  display: block;
+  max-width: 220px;
+  max-height: 170px;
+  min-width: 56px;
+  min-height: 56px;
+  object-fit: cover;
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+}
+.file-chip:hover {
+  border-color: var(--accent-line);
+  text-decoration: none;
+}
+.file-chip .faint {
+  flex: none;
+  font-size: 11.5px;
+}
 .msg-user .via {
   display: block;
   margin-top: 4px;

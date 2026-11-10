@@ -10,6 +10,7 @@ import {
   ListChecks,
   Loader2,
   MessageSquare,
+  Paperclip,
   NotebookPen,
   PencilLine,
   RotateCcw,
@@ -22,7 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
-import type { AgentEvent } from '../../../shared/types.ts';
+import type { AgentEvent, Attachment } from '../../../shared/types.ts';
 import { toolName } from '../lib.ts';
 import type { StreamingBlock } from '../store.ts';
 import { Markdown } from './ui.tsx';
@@ -37,7 +38,7 @@ interface Step {
 }
 
 type Item =
-  | { kind: 'user'; key: string; from: string; text: string; via?: string; voice?: boolean }
+  | { kind: 'user'; key: string; from: string; text: string; via?: string; voice?: boolean; attachments?: Attachment[] }
   | { kind: 'text'; key: string; text: string }
   | { kind: 'thinking'; key: string; text: string }
   | { kind: 'steps'; key: string; steps: Step[] }
@@ -52,7 +53,7 @@ function group(events: AgentEvent[], closed: boolean): Item[] {
     const key = `e${e.id}`;
     switch (e.type) {
       case 'user':
-        items.push({ kind: 'user', key, from: e.data.from ?? 'user', text: String(e.data.text ?? ''), via: e.data.via, voice: !!e.data.voice });
+        items.push({ kind: 'user', key, from: e.data.from ?? 'user', text: String(e.data.text ?? ''), via: e.data.via, voice: !!e.data.voice, attachments: e.data.attachments });
         break;
       case 'text': {
         const text = String(e.data.text ?? '').trim();
@@ -236,6 +237,35 @@ function Brief({ who, text }: { who: string; text: string }) {
   );
 }
 
+function attachmentNoun(list: Attachment[]): string {
+  const photos = list.every((a) => a.mime.startsWith('image/'));
+  return `${photos ? 'photo' : 'file'}${list.length === 1 ? '' : 's'}`;
+}
+
+/** Files that came with a message: pictures as thumbnails, everything else as a download chip. */
+function Attachments({ list }: { list: Attachment[] }) {
+  // The saved copy's file name is all the dashboard needs; the folder it sits in is the server's business.
+  const href = (a: Attachment) => `/api/inbox/${encodeURIComponent(a.path.split(/[\\/]/).pop() ?? '')}`;
+  const pictures = list.filter((a) => a.mime.startsWith('image/') && a.image);
+  const files = list.filter((a) => !pictures.includes(a));
+  return (
+    <div className="attachments">
+      {pictures.map((a) => (
+        <a key={a.path} href={href(a)} target="_blank" rel="noreferrer noopener" className="thumb" title={a.name}>
+          <img src={href(a)} alt={a.name} loading="lazy" />
+        </a>
+      ))}
+      {files.map((a) => (
+        <a key={a.path} href={href(a)} className="file-chip" title={`Download ${a.name}`}>
+          <Paperclip size={13} />
+          <span className="truncate">{a.name}</span>
+          <span className="faint">{a.size < 1024 * 1024 ? `${Math.max(1, Math.round(a.size / 1024))} KB` : `${(a.size / 1024 / 1024).toFixed(1)} MB`}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function Thinking({ text, live }: { text: string; live?: boolean }) {
   return (
     <details className="thinking">
@@ -272,8 +302,9 @@ export const Transcript = memo(function Transcript({
             if (it.from === 'user' && variant === 'pm') {
               return (
                 <div key={it.key} className="msg-user">
+                  {it.attachments?.length ? <Attachments list={it.attachments} /> : null}
                   {it.text}
-                  {it.via === 'telegram' && <span className="via">{it.voice ? 'voice note from Telegram' : 'sent from Telegram'}</span>}
+                  {it.via === 'telegram' && <span className="via">{it.voice ? 'voice note from Telegram' : it.attachments?.length ? `${attachmentNoun(it.attachments)} sent from Telegram` : 'sent from Telegram'}</span>}
                 </div>
               );
             }

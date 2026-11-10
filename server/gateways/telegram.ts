@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import type { Approval, TelegramChat, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import type { Approval, Attachment, TelegramChat, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 import { subscribe, sync } from '../bus.ts';
 import { kvGet, kvSet } from '../db.ts';
+import { fileSize, mimeOf, saveToInbox } from '../inbox.ts';
 import { getTelegramToken, setTelegramToken } from '../settings.ts';
 import { resolveVoice, saveVoiceSettings, transcribe, voiceStatus } from './transcribe.ts';
 
@@ -15,7 +18,7 @@ import { resolveVoice, saveVoiceSettings, transcribe, voiceStatus } from './tran
 
 export interface TelegramDeps {
   /** Hand a message from the phone to the project manager. `voice` marks a transcribed voice note. */
-  chat(text: string, voice?: boolean): void;
+  chat(text: string, opts?: { voice?: boolean; attachments?: Attachment[] }): void;
   stopPm(): void;
   isPmBusy(): boolean;
   /** A short Markdown summary of what is running, for /status. */
@@ -82,12 +85,39 @@ export function chunk(text: string, max = 3500): string[] {
   return out;
 }
 
+// ---------- incoming photos and files ----------
+
+interface Media {
+  fileId: string;
+  name: string;
+  mime: string;
+  size: number;
+}
+
+const ALBUM_WAIT_MS = Number(process.env.MAJORDOMO_ALBUM_WAIT_MS || 1200);
+
+/** Pick out the file a message carries, if it is a kind we keep. */
+function mediaOf(m: any): Media | null {
+  const when = new Date((m.date ?? Date.now() / 1000) * 1000).toISOString().slice(11, 19).replace(/:/g, '');
+  if (m.document) {
+    return { fileId: m.document.file_id, name: m.document.file_name || 'file', mime: m.document.mime_type || '', size: m.document.file_size ?? 0 };
+  }
+  if (Array.isArray(m.photo) && m.photo.length) {
+    // Telegram offers each photo in several sizes, smallest first; take the largest.
+    const best = m.photo[m.photo.length - 1];
+    return { fileId: best.file_id, name: `photo-${when}.jpg`, mime: 'image/jpeg', size: best.file_size ?? 0 };
+  }
+  const video = m.video ?? m.video_note;
+  if (video) return { fileId: video.file_id, name: video.file_name || `video-${when}.mp4`, mime: video.mime_type || 'video/mp4', size: video.file_size ?? 0 };
+  return null;
+}
+
 // ---------- the gateway ----------
 
 const HELP = [
   '**Majordomo** — your project manager, on your phone.',
   '',
-  'Just write to me like you would at the desk: describe a project, ask where something stands, change your mind. Voice notes work too.',
+  'Just write to me like you would at the desk: describe a project, ask where something stands, change your mind. Voice notes work too, and you can send photos and files.',
   '',
   '/status — what the crew is doing right now',
   '/stop — stop the manager mid-reply',
@@ -107,6 +137,8 @@ class TelegramGateway {
   private approvalMessages = new Map<string, { chatId: number; messageId: number; text: string }[]>();
   private approvalOutcome = new Map<string, string>();
   private lastInbound = 0;
+  /** Photos sent together arrive as separate messages; they are gathered here and passed on as one. */
+  private albums = new Map<string, { chatId: number; caption: string; attachments: Attachment[]; timer: NodeJS.Timeout }>();
 
   constructor() {
     subscribe((msg) => {
@@ -204,6 +236,8 @@ class TelegramGateway {
     this.connected = false;
     for (const t of this.typing.values()) clearInterval(t);
     this.typing.clear();
+    for (const a of this.albums.values()) clearTimeout(a.timer);
+    this.albums.clear();
   }
 
   restart(): void {
@@ -214,15 +248,17 @@ class TelegramGateway {
     this.push();
   }
 
-  private async call<T = any>(method: string, params: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
+  /** `params` is sent as JSON, or as a multipart form when a file is being uploaded. */
+  private async call<T = any>(method: string, params: Record<string, unknown> | FormData = {}, signal?: AbortSignal): Promise<T> {
     const token = getTelegramToken();
     if (!token) throw new TelegramError('No bot token', 401);
+    const form = params instanceof FormData;
     let res: Response;
     try {
       res = await fetch(`${API()}/bot${token}/${method}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        headers: form ? undefined : { 'Content-Type': 'application/json' },
+        body: form ? params : JSON.stringify(params),
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000),
       });
     } catch (err) {
@@ -326,8 +362,10 @@ class TelegramGateway {
 
     const audio = m.voice ?? m.audio;
     if (audio) return this.handleVoice(chatId, audio, typeof m.caption === 'string' ? m.caption.trim() : '');
+    const media = mediaOf(m);
+    if (media) return this.handleMedia(chatId, media, typeof m.caption === 'string' ? m.caption.trim() : '', m.media_group_id);
     if (!text) {
-      await this.send(chatId, 'I can read text and voice notes, but not photos, videos or files yet.');
+      await this.send(chatId, 'I can take text, voice notes, photos and files, but not that kind of message.');
       return;
     }
     const command = /^\/(\w+)(?:@\w+)?/.exec(text)?.[1]?.toLowerCase();
@@ -390,8 +428,74 @@ class TelegramGateway {
     await this.call('sendMessage', { chat_id: chatId, text: `<i>Heard:</i> ${esc(shown)}`, parse_mode: 'HTML' }).catch(() => {});
 
     this.lastInbound = Date.now();
-    this.deps?.chat(caption ? `${heard}\n\n(Caption typed with the recording: ${caption})` : heard, true);
+    this.deps?.chat(caption ? `${heard}\n\n(Caption typed with the recording: ${caption})` : heard, { voice: true });
     this.showTyping(chatId);
+  }
+
+  /** A photo or file: save it to the inbox and tell the manager it arrived. */
+  private async handleMedia(chatId: number, media: Media, caption: string, group?: string): Promise<void> {
+    // Telegram lets a bot download files up to 20 MB.
+    if (media.size > 20 * 1024 * 1024) {
+      await this.send(chatId, `${media.name} is ${fileSize(media.size)}, and Telegram only lets me fetch files up to 20 MB. Send a smaller version, or put it on the computer directly.`);
+      return;
+    }
+    let saved: Attachment;
+    try {
+      const file = await this.call<{ file_path?: string }>('getFile', { file_id: media.fileId });
+      if (!file.file_path) throw new Error('Telegram did not return the file.');
+      saved = await saveToInbox(media.name, await this.download(file.file_path), media.mime);
+    } catch (err) {
+      await this.send(chatId, `I couldn't fetch ${media.name}: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+
+    if (!group) return this.passOn(chatId, caption, [saved]);
+    // Part of an album: wait briefly for the rest, since only one of the messages carries the caption.
+    const key = `${chatId}:${group}`;
+    const album = this.albums.get(key) ?? { chatId, caption: '', attachments: [], timer: setTimeout(() => {}, 0) };
+    clearTimeout(album.timer);
+    album.attachments.push(saved);
+    if (caption) album.caption = caption;
+    album.timer = setTimeout(() => {
+      this.albums.delete(key);
+      this.passOn(album.chatId, album.caption, album.attachments);
+    }, ALBUM_WAIT_MS);
+    this.albums.set(key, album);
+  }
+
+  private passOn(chatId: number, caption: string, attachments: Attachment[]): void {
+    this.lastInbound = Date.now();
+    this.deps?.chat(caption, { attachments });
+    this.showTyping(chatId);
+  }
+
+  /** Send a file from this computer to every linked chat. Images go as photos, everything else as documents. */
+  async sendFile(file: string, caption: string): Promise<string> {
+    if (!this.abort || !this.connected) throw new Error('Telegram is not connected, so there is no phone to send to. The user can set it up under Settings → Phone.');
+    const chats = this.chats;
+    if (!chats.length) throw new Error('No phone is linked yet. The user can link one under Settings → Phone.');
+    const bytes = await fs.readFile(file);
+    const name = path.basename(file);
+    const mime = mimeOf(name);
+    // Telegram recompresses photos and caps them at 10 MB; anything else, or bigger, goes as a file.
+    const asPhoto = ['image/jpeg', 'image/png', 'image/webp'].includes(mime) && bytes.length <= 10 * 1024 * 1024;
+    const upload = (method: 'sendPhoto' | 'sendDocument', chatId: number) => {
+      const form = new FormData();
+      form.set('chat_id', String(chatId));
+      if (caption) form.set('caption', caption.slice(0, 1024));
+      form.set(method === 'sendPhoto' ? 'photo' : 'document', new Blob([bytes], { type: mime }), name);
+      return this.call(method, form);
+    };
+    for (const chat of chats) {
+      try {
+        await upload(asPhoto ? 'sendPhoto' : 'sendDocument', chat.id);
+      } catch (err) {
+        // A picture Telegram will not take as a photo (odd dimensions, say) still goes through as a file.
+        if (!asPhoto || !(err instanceof TelegramError) || err.code !== 400) throw new Error(`Telegram would not take ${name}: ${err instanceof Error ? err.message : String(err)}`);
+        await upload('sendDocument', chat.id);
+      }
+    }
+    return `Sent ${name} (${fileSize(bytes.length)}) to the user's phone.`;
   }
 
   private async download(filePath: string): Promise<Buffer> {

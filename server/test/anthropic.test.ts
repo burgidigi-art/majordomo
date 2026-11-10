@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import type { Msg, Provider, ToolDef } from '../llm/types.ts';
 import { mockApi, tempHome, type Recorded } from './helpers.ts';
@@ -31,8 +33,11 @@ let api: Awaited<ReturnType<typeof mockApi>>;
 let provider: Provider;
 const tools: ToolDef[] = [{ name: 'echo', description: 'Echo text', schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } }];
 
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+let home = '';
+
 before(async () => {
-  tempHome();
+  home = tempHome();
   api = await mockApi((req, n) => {
     if (n === 1) {
       return {
@@ -126,4 +131,33 @@ test('rebuilds turns that came from another provider', async () => {
   const sent = api.requests[before].body.messages;
   assert.deepEqual(sent[1].content, [{ type: 'tool_use', id: 'call_1_x', name: 'echo', input: { text: 'a' } }]);
   assert.equal(sent[2].content[0].tool_use_id, 'call_1_x', 'ids are sanitised the same way on both sides');
+});
+
+test('sends images as image blocks, in user turns and in tool results', async () => {
+  const file = path.join(home, 'photo.png');
+  fs.writeFileSync(file, Buffer.from(PNG, 'base64'));
+  const before = api.requests.length;
+  await provider.chat({
+    model: 'claude-opus-5-5',
+    system: 's',
+    messages: [
+      { role: 'user', parts: [{ type: 'text', text: 'What is on the whiteboard?' }, { type: 'image', path: file, mime: 'image/png' }] },
+      { role: 'assistant', parts: [{ type: 'tool_call', id: 'toolu_5', name: 'echo', input: { text: 'x' } }] },
+      {
+        role: 'user',
+        parts: [
+          { type: 'tool_result', id: 'toolu_5', name: 'echo', output: 'Showing chart.png', images: [{ path: file, mime: 'image/png' }] },
+          { type: 'image', path: path.join(home, 'gone.png'), mime: 'image/png' },
+        ],
+      },
+    ],
+    tools,
+    signal: new AbortController().signal,
+    onDelta: () => {},
+  });
+  const sent = api.requests[before].body.messages;
+  const image = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG } };
+  assert.deepEqual(sent[0].content, [image, { type: 'text', text: 'What is on the whiteboard?' }], 'the image leads, the question follows');
+  assert.deepEqual(sent[2].content[0], { type: 'tool_result', tool_use_id: 'toolu_5', content: [{ type: 'text', text: 'Showing chart.png' }, image] });
+  assert.match(sent[2].content[1].text, /gone\.png\) but the file is no longer on disk/, 'a deleted image degrades to a note, not a failed request');
 });

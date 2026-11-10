@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import http from 'node:http';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { tempHome, until } from './helpers.ts';
 
 process.env.MAJORDOMO_DEMO = '1';
 process.env.MAJORDOMO_DEMO_SPEED = '60';
-tempHome();
+process.env.MAJORDOMO_ALBUM_WAIT_MS = '150';
+const home = tempHome();
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
 const TOKEN = '123456789:AAE-test_token_for_the_mock_server_0123';
 
@@ -21,6 +25,44 @@ const tg = {
   /** What the mock speech-to-text services answer with next. */
   heard: 'hi there' as string | { status: number },
   audio: Buffer.from('not-real-audio'),
+  /** Files Telegram would serve for download, by file_id. */
+  files: {} as Record<string, Buffer>,
+  /** Multipart uploads the harness made (sendPhoto / sendDocument). */
+  uploads: [] as { method: string; raw: Buffer }[],
+  photo(chatId: number, extra: { caption?: string; media_group_id?: string; file_size?: number } = {}) {
+    const id = `photo-${this.nextUpdate}`;
+    this.files[id] = PNG;
+    const { file_size, ...rest } = extra;
+    this.updates.push({
+      update_id: this.nextUpdate++,
+      message: {
+        message_id: this.nextMessage++,
+        date: 1794323000,
+        chat: { id: chatId, type: 'private' },
+        from: { first_name: 'Ada', last_name: 'L' },
+        // Telegram lists a photo's sizes smallest first.
+        photo: [
+          { file_id: `${id}-thumb`, width: 90, height: 90, file_size: 10 },
+          { file_id: id, width: 1280, height: 960, file_size: file_size ?? PNG.length },
+        ],
+        ...rest,
+      },
+    });
+  },
+  document(chatId: number, name: string, bytes: Buffer, caption?: string) {
+    const id = `doc-${this.nextUpdate}`;
+    this.files[id] = bytes;
+    this.updates.push({
+      update_id: this.nextUpdate++,
+      message: {
+        message_id: this.nextMessage++,
+        chat: { id: chatId, type: 'private' },
+        from: { first_name: 'Ada', last_name: 'L' },
+        document: { file_id: id, file_name: name, mime_type: 'application/octet-stream', file_size: bytes.length },
+        caption,
+      },
+    });
+  },
   server: null as http.Server | null,
   url: '',
   message(chatId: number, text: string | undefined, extra: object = {}) {
@@ -96,8 +138,21 @@ before(async () => {
         res.writeHead(200, { 'content-type': 'application/octet-stream' });
         return res.end(tg.audio);
       }
+      const dl = new RegExp(`^/file/bot${TOKEN}/files/(.+)$`).exec(url);
+      if (dl && tg.files[dl[1]]) {
+        res.writeHead(200, { 'content-type': 'application/octet-stream' });
+        return res.end(tg.files[dl[1]]);
+      }
 
       const m = /^\/bot([^/]+)\/(\w+)$/.exec(url);
+      if (m && m[1] === TOKEN && /^multipart\/form-data/.test(req.headers['content-type'] ?? '')) {
+        tg.uploads.push({ method: m[2], raw: rawBody });
+        // Refuse one particular picture as a photo, the way Telegram does for odd dimensions.
+        if (m[2] === 'sendPhoto' && rawBody.includes('filename="panorama.png"')) {
+          return send(400, { ok: false, error_code: 400, description: 'Bad Request: PHOTO_INVALID_DIMENSIONS' });
+        }
+        return send(200, { ok: true, result: { message_id: tg.nextMessage++ } });
+      }
       const body = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {};
       const reply = (result: unknown) => send(200, { ok: true, result });
       if (!m || m[1] !== TOKEN) return send(401, { ok: false, error_code: 401, description: 'Unauthorized' });
@@ -109,7 +164,9 @@ before(async () => {
       }
       tg.calls.push({ method, body });
       if (method === 'getMe') return reply({ id: 1, is_bot: true, username: 'majordomo_test_bot' });
-      if (method === 'getFile') return reply({ file_id: body.file_id, file_path: 'voice/file_7.oga' });
+      if (method === 'getFile') {
+        return reply({ file_id: body.file_id, file_path: tg.files[body.file_id] ? `files/${body.file_id}` : 'voice/file_7.oga' });
+      }
       if (method === 'sendMessage') {
         // Stand in for Telegram refusing our markup, so the plain-text fallback is exercised.
         if (body.parse_mode === 'HTML' && body.text.includes('unparseable')) {
@@ -386,6 +443,134 @@ test('a stranger’s voice note is never fetched or transcribed', async () => {
   assert.deepEqual([tg.count('getFile'), tg.stt.length], [downloads, requests]);
 });
 
+// ---------- photos and files ----------
+
+const inboxDir = () => path.join(home, 'inbox');
+const inboxNames = () => (fs.existsSync(inboxDir()) ? fs.readdirSync(inboxDir()).sort() : []);
+const get = (p: string) => app.request(p, { headers: local });
+
+test('a photo is saved to the inbox, shown to the manager, and visible in the dashboard', async () => {
+  await until(pmIdle);
+  tg.photo(42, { caption: 'the whiteboard from today' });
+  await until(() => pmTurns().at(-1)?.data.attachments?.length === 1 && pmIdle());
+
+  const turn = pmTurns().at(-1)!;
+  const [att] = turn.data.attachments;
+  assert.equal(turn.data.text, 'the whiteboard from today');
+  assert.match(att.name, /^photo-\d{6}\.jpg$/);
+  assert.deepEqual([att.mime, att.size, att.image], ['image/jpeg', PNG.length, true]);
+  assert.equal(path.dirname(att.path), inboxDir());
+  assert.ok(fs.readFileSync(att.path).equals(PNG), 'the largest size Telegram offered was the one fetched');
+
+  // What the model receives: the caption, where the file is, and the picture itself.
+  const msg = db.messages.load<any>('pm').findLast((m) => m.role === 'user' && m.parts.some((p: any) => p.type === 'image'))!;
+  assert.deepEqual(msg.parts.find((p: any) => p.type === 'image'), { type: 'image', path: att.path, mime: 'image/jpeg' });
+  const text = msg.parts.find((p: any) => p.type === 'text').text;
+  assert.match(text, /the whiteboard from today\n\n<attachments>/);
+  assert.ok(text.includes(`saved at ${att.path} — shown to you with this message`));
+  assert.match(text, /add_file_to_project/);
+  await until(() => /Got the file — saved to the inbox/.test(lastSent()));
+
+  const served = await get(`/api/inbox/${encodeURIComponent(path.basename(att.path))}`);
+  assert.deepEqual([served.status, served.headers.get('content-type')], [200, 'image/jpeg']);
+  assert.equal((await get('/api/inbox/..%2Fsecrets.json')).status, 404, 'the endpoint serves the inbox and nothing else');
+});
+
+test('a document keeps its name, minus anything that could escape the inbox', async () => {
+  const before = inboxNames().length;
+  tg.document(42, '../../evil plan?.sh', Buffer.from('#!/bin/sh\necho hi\n'));
+  await until(() => inboxNames().length === before + 1 && pmIdle());
+  const saved = inboxNames().find((n) => n.endsWith('evil plan_.sh'))!;
+  assert.ok(saved, 'path separators and odd characters are stripped from the name');
+  assert.ok(!fs.existsSync(path.join(home, '..', 'evil plan_.sh')) && !fs.existsSync(path.join(home, 'evil plan_.sh')));
+  const turn = pmTurns().at(-1)!;
+  assert.equal(turn.data.text, '', 'no caption was typed');
+  assert.equal(turn.data.attachments[0].image, false);
+  assert.match(JSON.stringify(db.messages.load('pm').at(-2)), /\(The user sent this without a message\.\)/);
+
+  // It can be downloaded from the dashboard, but is never rendered there.
+  const served = await get(`/api/inbox/${encodeURIComponent(saved)}`);
+  assert.equal(served.headers.get('content-type'), 'application/octet-stream');
+  assert.match(served.headers.get('content-disposition') ?? '', /^attachment/);
+});
+
+test('photos sent as an album reach the manager as one message', async () => {
+  await until(pmIdle);
+  const turns = pmTurns().length;
+  tg.photo(42, { media_group_id: 'album-1', caption: 'three angles of the shelf' });
+  tg.photo(42, { media_group_id: 'album-1' });
+  tg.photo(42, { media_group_id: 'album-1' });
+  await until(() => pmTurns().length === turns + 1 && pmIdle());
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(pmTurns().length, turns + 1);
+  const turn = pmTurns().at(-1)!;
+  assert.equal(turn.data.text, 'three angles of the shelf');
+  assert.equal(turn.data.attachments.length, 3);
+  assert.equal(new Set(turn.data.attachments.map((a: any) => a.path)).size, 3, 'each photo got its own file');
+  await until(() => /Got all 3 files/.test(lastSent()));
+});
+
+test('oversized files and strangers’ files are never fetched', async () => {
+  const [fetched, saved] = [tg.count('getFile'), inboxNames().length];
+  tg.photo(42, { file_size: 30 * 1024 * 1024 });
+  await until(() => /only lets me fetch files up to 20 MB/.test(lastSent()));
+  tg.photo(888, { caption: 'look at this' });
+  await until(() => tg.sent(888).length === 1);
+  assert.match(tg.sent(888)[0].text, /This bot is private/);
+  assert.deepEqual([tg.count('getFile'), inboxNames().length], [fetched, saved]);
+});
+
+test('the manager can copy an inbox file into a project and send a file back to the phone', async () => {
+  const { pmTools } = await import('../tools/pm.ts');
+  const tools = pmTools(orch.orch);
+  const ctx = { agentId: 'pm', cwd: home, signal: new AbortController().signal, host: {} as never };
+  const run = (name: string, input: object) => tools.find((t) => t.name === name)!.run(input, ctx).then(String);
+  const project = db.projects.all().at(-1)!;
+
+  const photo = inboxNames().find((n) => /photo-\d{6}\.jpg$/.test(n))!;
+  assert.match(await run('add_file_to_project', { project: project.id, file: path.join(inboxDir(), photo) }), /Copied to attachments\/photo-\d{6}\.jpg/);
+  const copied = path.join(project.workspace, 'attachments', photo.replace(/^\d{8}-\d{6}-/, ''));
+  assert.ok(fs.readFileSync(copied).equals(PNG), 'the project copy drops the inbox timestamp and keeps the bytes');
+  await assert.rejects(() => run('add_file_to_project', { project: project.id, file: '../secrets.json' }), /no file .* in the inbox/);
+  await assert.rejects(() => run('add_file_to_project', { project: project.id, file: photo, to: '../../outside.jpg' }), /outside the workspace/);
+
+  // Sending: a document goes as a document, a picture as a photo, each with its caption.
+  fs.writeFileSync(path.join(project.workspace, 'report.md'), '# Report\n\nAll done.\n');
+  fs.writeFileSync(path.join(project.workspace, 'chart.png'), PNG);
+  fs.writeFileSync(path.join(project.workspace, 'panorama.png'), PNG);
+  assert.match(await run('send_file', { project: project.id, path: 'report.md', caption: 'The summary you asked for' }), /Sent report\.md \(\d+ B\) to the user's phone/);
+  await run('send_file', { project: project.id, path: 'chart.png' });
+  const [doc, pic] = tg.uploads.slice(-2);
+  assert.equal(doc.method, 'sendDocument');
+  const form = doc.raw.toString('latin1');
+  assert.match(form, /name="chat_id"\r\n\r\n42\r\n/);
+  assert.match(form, /name="caption"\r\n\r\nThe summary you asked for/);
+  assert.match(form, /name="document"; filename="report\.md"/);
+  assert.ok(doc.raw.includes('# Report\n\nAll done.\n'));
+  assert.equal(pic.method, 'sendPhoto');
+  assert.ok(pic.raw.includes(PNG));
+  assert.ok(db.events.list('pm').some((e) => e.type === 'notice' && e.data.text === 'Sent report.md to your phone.'), 'the dashboard records what went out');
+
+  // A picture Telegram refuses as a photo is retried as a plain file.
+  await run('send_file', { project: project.id, path: 'panorama.png' });
+  assert.deepEqual(tg.uploads.slice(-2).map((u) => u.method), ['sendPhoto', 'sendDocument']);
+
+  await assert.rejects(() => run('send_file', { project: project.id, path: '../../secrets.json' }), /outside the workspace/);
+  await assert.rejects(() => run('send_file', { project: project.id, path: 'missing.pdf' }), /No such file/);
+});
+
+test('an agent can look at an image with view_image', async () => {
+  const { workerTools } = await import('../tools/worker.ts');
+  const view = workerTools({ canDelegate: false }).find((t) => t.name === 'view_image')!;
+  const project = db.projects.all().at(-1)!;
+  const ctx = { agentId: 'T-x', cwd: project.workspace, signal: new AbortController().signal, host: {} as never };
+  const out = await view.run({ path: 'chart.png' }, ctx);
+  assert.deepEqual(out, { text: `Showing chart.png (image/png, ${PNG.length} B).`, images: [{ path: path.join(project.workspace, 'chart.png'), mime: 'image/png' }] });
+  await assert.rejects(() => view.run({ path: 'report.md' }, ctx), /not an image this tool can show/);
+  fs.writeFileSync(path.join(project.workspace, 'huge.png'), Buffer.alloc(5_000_000));
+  await assert.rejects(() => view.run({ path: 'huge.png' }, ctx), /too large to view directly/);
+});
+
 test('/unlink disconnects the chat', async () => {
   tg.message(42, '/unlink');
   await until(() => telegram.status().chats.length === 0);
@@ -393,4 +578,5 @@ test('/unlink disconnects the chat', async () => {
   tg.message(42, 'are you there?');
   await until(() => tg.sent(42).some((m) => /This bot is private/.test(m.text)));
   assert.equal(db.events.list('pm').filter((e) => e.type === 'user').length, turns);
+  await assert.rejects(() => telegram.sendFile(path.join(home, 'majordomo.db'), ''), /No phone is linked yet/);
 });

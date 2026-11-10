@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
+import { fileSize, isVisionImage, mimeOf, VISION_MAX_BYTES } from '../inbox.ts';
 import { clip, defineTool, ToolError, type Tool } from './tool.ts';
 
 // ---------- path handling ----------
@@ -225,6 +226,25 @@ const searchFiles = defineTool({
   },
 });
 
+const viewImage = defineTool({
+  name: 'view_image',
+  description:
+    'Look at an image file (JPEG, PNG, GIF or WebP): a photo the user sent, a screenshot, a chart you generated. ' +
+    'The image is shown to you in the result. Paths are relative to the project workspace; absolute paths also work.',
+  input: z.object({ path: z.string() }),
+  async run({ path: p }, ctx) {
+    const file = resolvePath(ctx.cwd, p);
+    const stat = await fs.stat(file).catch(() => null);
+    if (!stat?.isFile()) throw new ToolError(`No such file: ${p}`);
+    const mime = mimeOf(file);
+    if (!mime.startsWith('image/')) throw new ToolError(`${p} is not an image this tool can show (JPEG, PNG, GIF or WebP).`);
+    if (!isVisionImage(mime, stat.size)) {
+      throw new ToolError(`${p} is ${fileSize(stat.size)}, too large to view directly (limit ${fileSize(VISION_MAX_BYTES)}). Shrink a copy first, for example with ImageMagick or sips.`);
+    }
+    return { text: `Showing ${p} (${mime}, ${fileSize(stat.size)}).`, images: [{ path: file, mime }] };
+  },
+});
+
 // ---------- web ----------
 
 function isPrivateHost(host: string): boolean {
@@ -330,7 +350,7 @@ const delegate = defineTool({
 });
 
 export function workerTools(opts: { canDelegate: boolean }): Tool[] {
-  const tools: Tool[] = [bash, readFile, writeFile, editFile, listFiles, searchFiles, webFetch, reportProgress, askManager];
+  const tools: Tool[] = [bash, readFile, writeFile, editFile, listFiles, searchFiles, viewImage, webFetch, reportProgress, askManager];
   if (opts.canDelegate) tools.push(delegate);
   return tools;
 }

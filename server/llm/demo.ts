@@ -159,6 +159,16 @@ async function pmTurn(req: ChatRequest): Promise<Part[]> {
     ];
   }
 
+  const files = /<attachments>[\s\S]*?<\/attachments>/.exec(text)?.[0].match(/^- /gm)?.length ?? 0;
+  if (files) {
+    return [
+      await say(
+        req,
+        `Got ${files === 1 ? 'the file' : `all ${files} files`} — saved to the inbox on your computer. Tell me which project ${files === 1 ? 'it belongs' : 'they belong'} to and what you want done, and I will hand ${files === 1 ? 'it' : 'them'} to the crew.`,
+      ),
+    ];
+  }
+
   const plain = text.replace(/<context>[\s\S]*?<\/context>/g, '').trim();
   if (plain.length < 24 || /^(hi|hello|hey|thanks|thank you|what can you do|who are you)\b/i.test(plain)) {
     return [

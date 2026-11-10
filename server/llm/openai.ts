@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import type { ModelOption, RuntimeId } from '../../shared/types.ts';
 import { getSecret } from '../settings.ts';
-import type { ChatRequest, ChatResponse, Msg, Part, Provider, StopKind } from './types.ts';
+import { missingImage, readImage, type ChatRequest, type ChatResponse, type ImageRef, type Msg, type Part, type Provider, type StopKind } from './types.ts';
 
 type CompatRuntime = 'openai' | 'gemini' | 'muse' | 'openrouter';
 
@@ -46,7 +46,28 @@ function toMessages(req: ChatRequest, runtime: CompatRuntime): ChatMsg[] {
         .filter((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
         .map((p) => p.text)
         .join('\n\n');
-      if (text) out.push({ role: 'user', content: text });
+      // Images the user attached, plus any a tool returned: a tool message can only carry text
+      // in this protocol, so tool images ride in the user message that follows it.
+      const images: ImageRef[] = [];
+      let fromTools = false;
+      for (const p of msg.parts) {
+        if (p.type === 'image') images.push(p);
+        if (p.type === 'tool_result' && !p.server && p.images?.length) {
+          images.push(...p.images);
+          fromTools = true;
+        }
+      }
+      if (images.length) {
+        const lead = [fromTools ? 'The image(s) returned by the tool call above:' : '', text].filter(Boolean).join('\n\n');
+        const content: any[] = lead ? [{ type: 'text', text: lead }] : [];
+        for (const ref of images) {
+          const data = readImage(ref);
+          content.push(data ? { type: 'image_url', image_url: { url: `data:${ref.mime};base64,${data}` } } : { type: 'text', text: missingImage(ref) });
+        }
+        out.push({ role: 'user', content });
+      } else if (text) {
+        out.push({ role: 'user', content: text });
+      }
       continue;
     }
     if (msg.raw?.runtime === runtime && msg.raw.content) {

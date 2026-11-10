@@ -85,7 +85,7 @@ test('workers cannot write outside their workspace', async () => {
   const ctx = { agentId: 'T-x', cwd: db.projects.all()[0].workspace, signal: new AbortController().signal, host: {} as never };
   await assert.rejects(() => write.run({ path: '../escape.txt', content: 'x' }, ctx), /outside the project workspace/);
   await assert.rejects(() => write.run({ path: '/tmp/escape.txt', content: 'x' }, ctx), /outside the project workspace/);
-  assert.match(await write.run({ path: 'nested/ok.txt', content: 'x' }, ctx), /Wrote nested\/ok.txt/);
+  assert.match(String(await write.run({ path: 'nested/ok.txt', content: 'x' }, ctx)), /Wrote nested\/ok.txt/);
 });
 
 test('the HTTP API only answers its own dashboard', async () => {

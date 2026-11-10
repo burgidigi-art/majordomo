@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { Project, Reminder, Task } from '../../shared/types.ts';
 import { events, memory, projects, reminders, tasks } from '../db.ts';
+import { fileSize, inboxFile } from '../inbox.ts';
 import { getSettings } from '../settings.ts';
 import { clip, defineTool, ToolError, type Tool } from './tool.ts';
 import { walk, webFetch } from './worker.ts';
@@ -18,6 +19,8 @@ export interface Orch {
   messageTask(id: string, text: string, from: 'manager' | 'user'): void;
   cancelTask(id: string, reason: string): void;
   retryTask(id: string, note?: string): void;
+  /** Deliver a file to the user's phone. Resolves to a sentence saying where it went. */
+  sendFileToUser(file: string, caption: string): Promise<string>;
   memoryChanged(): void;
   remindersChanged(): void;
 }
@@ -269,6 +272,54 @@ export function pmTools(orch: Orch): Tool[] {
     },
   });
 
+  const addFileToProject = defineTool({
+    name: 'add_file_to_project',
+    description:
+      'Copy a file the user sent (it is in the inbox; its name is given in the <attachments> block of their message) into a ' +
+      "project's workspace, so the agents on that project can work with it. Returns the path to quote in task briefs.",
+    input: z.object({
+      project: z.string(),
+      file: z.string().describe('The inbox file name, or its full path, exactly as given in <attachments>.'),
+      to: z.string().optional().describe('Where to put it inside the workspace. Default: attachments/<original name>.'),
+    }),
+    async run({ project, file, to }) {
+      const p = needProject(project);
+      const source = await inboxFile(path.basename(file));
+      if (!source) throw new ToolError(`There is no file "${file}" in the inbox. Use the name from the <attachments> block.`);
+      // Inbox copies are named <timestamp>-<original name>; the project gets the original name back.
+      const original = path.basename(source).replace(/^\d{8}-\d{6}-/, '');
+      const dest = inWorkspace(p, to ?? path.join('attachments', original));
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.copyFile(source, dest);
+      const rel = path.relative(p.workspace, dest);
+      return `Copied to ${rel} in ${p.id} "${p.name}". Agents on this project can open it at that path.`;
+    },
+  });
+
+  const sendFile = defineTool({
+    name: 'send_file',
+    description:
+      "Send a file from a project's workspace to the user's phone (over Telegram): a finished report, an image, an export. " +
+      'Use it when they ask for a deliverable while away from their computer, or when handing over something they will want to open.',
+    input: z.object({
+      project: z.string(),
+      path: z.string().describe('Path of the file inside the project workspace.'),
+      caption: z.string().max(900).optional().describe('A line of text to show with the file.'),
+    }),
+    async run({ project, path: sub, caption }) {
+      const p = needProject(project);
+      const file = inWorkspace(p, sub);
+      const stat = await fs.stat(file).catch(() => null);
+      if (!stat?.isFile()) throw new ToolError(`No such file in ${p.id}: ${sub}`);
+      if (stat.size > 50 * 1024 * 1024) throw new ToolError(`${sub} is ${fileSize(stat.size)}; Telegram lets a bot send at most 50 MB.`);
+      try {
+        return await orch.sendFileToUser(file, caption ?? '');
+      } catch (err) {
+        throw new ToolError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  });
+
   const remember = defineTool({
     name: 'remember',
     description:
@@ -350,6 +401,8 @@ export function pmTools(orch: Orch): Tool[] {
     retryTask,
     listFiles,
     readFile,
+    addFileToProject,
+    sendFile,
     remember,
     forget,
     setReminder,

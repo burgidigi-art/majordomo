@@ -1,4 +1,4 @@
-import type { Effort, RuntimeId } from '../../shared/types.ts';
+import type { Attachment, Effort, RuntimeId } from '../../shared/types.ts';
 import { emit, emitDelta } from '../bus.ts';
 import { kvDelete, kvGet, kvSet, messages } from '../db.ts';
 import { costOf, describeError, getProvider } from '../llm/index.ts';
@@ -18,7 +18,17 @@ export interface InboxItem {
   via?: 'telegram';
   /** The text is a transcription of something the user said aloud. */
   voice?: boolean;
+  /** Files that came with the message. Images among them are shown to the model. */
+  attachments?: Attachment[];
 }
+
+/** One inbox message as conversation parts: its text, then any images it carries. */
+function toParts(item: InboxItem): Part[] {
+  const images = (item.attachments ?? []).filter((a) => a.image).map((a) => ({ type: 'image' as const, path: a.path, mime: a.mime }));
+  return [{ type: 'text', text: item.text }, ...images];
+}
+
+const shown = (it: InboxItem) => ({ from: it.from, text: it.display ?? it.text, via: it.via, voice: it.voice, attachments: it.attachments });
 
 export interface AgentSpec {
   id: string;
@@ -124,7 +134,7 @@ export class Runner {
       while (this.queued(id)) {
         const spec = this.hooks.spec(id);
         const items = this.take(id);
-        for (const it of items) emit(id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via, voice: it.voice });
+        for (const it of items) emit(id, 'user', shown(it));
         text =
           runtimeDef(spec.runtime).kind === 'cli'
             ? await this.cliTurn(spec, items, signal)
@@ -207,7 +217,7 @@ export class Runner {
       msgs = await this.compact(spec, msgs, signal);
     }
 
-    push({ role: 'user', parts: items.map((i) => ({ type: 'text' as const, text: i.text })) });
+    push({ role: 'user', parts: items.flatMap(toParts) });
 
     let continuations = 0;
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -274,11 +284,11 @@ export class Runner {
       // after the tool results, so the history stays append-only.
       const late = this.take(spec.id);
       for (const it of late) {
-        emit(spec.id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via, voice: it.voice });
+        emit(spec.id, 'user', shown(it));
         // A message folded in mid-turn is answered by this turn's reply, so it counts as a prompt for it.
         items.push(it);
       }
-      push({ role: 'user', parts: [...outputs, ...late.map((i) => ({ type: 'text' as const, text: i.text }))] });
+      push({ role: 'user', parts: [...outputs, ...late.flatMap(toParts)] });
 
       if (res.usage.input > getSettings().compactAtTokens) msgs = await this.compact(spec, msgs, signal);
     }
@@ -298,8 +308,10 @@ export class Runner {
       return fail(`Invalid input for ${call.name} — ${issues}. The tool was not run.`);
     }
     try {
-      const output = await tool.run(parsed.data, { agentId: spec.id, cwd: spec.cwd, signal, host: this.hooks.host });
-      return { type: 'tool_result', id: call.id, name: call.name, output };
+      const out = await tool.run(parsed.data, { agentId: spec.id, cwd: spec.cwd, signal, host: this.hooks.host });
+      return typeof out === 'string'
+        ? { type: 'tool_result', id: call.id, name: call.name, output: out }
+        : { type: 'tool_result', id: call.id, name: call.name, output: out.text, images: out.images };
     } catch (err) {
       if (signal.aborted) return fail('Stopped.');
       return fail(err instanceof ToolError ? err.message : `${call.name} failed: ${describeError(err)}`);

@@ -504,8 +504,9 @@ export function Settings() {
         <section className="section">
           <h2>Phone</h2>
           <p>
-            Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. The bot runs from this
-            computer, so it answers while Majordomo is running here.
+            Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. Voice notes, photos and
+            files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while Majordomo is running
+            here.
           </p>
           <Phone />
         </section>

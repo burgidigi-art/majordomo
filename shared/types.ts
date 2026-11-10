@@ -110,6 +110,17 @@ export interface Task {
   finishedAt: number | null;
 }
 
+/** A file the user sent in from outside the dashboard (a photo or document from their phone). */
+export interface Attachment {
+  name: string;
+  /** Absolute path of the saved copy in the inbox folder. */
+  path: string;
+  mime: string;
+  size: number;
+  /** An image small enough, and of a type, that a vision model can be shown directly. */
+  image: boolean;
+}
+
 export type AgentEventType =
   | 'user'
   | 'text'

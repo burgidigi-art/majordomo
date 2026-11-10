@@ -1,4 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Effort, ModelOption, RuntimeId } from '../../shared/types.ts';
+
+/** An image on disk. Only the path is stored; the bytes are read when a request is built. */
+export interface ImageRef {
+  path: string;
+  mime: string;
+}
 
 /**
  * Provider-neutral conversation format. Every adapter converts to and from this, so an agent's
@@ -6,6 +14,8 @@ import type { Effort, ModelOption, RuntimeId } from '../../shared/types.ts';
  */
 export type Part =
   | { type: 'text'; text: string }
+  /** An image for the model to look at (user turns only). */
+  | { type: 'image'; path: string; mime: string }
   /** Shown in the transcript only; never replayed to another provider. */
   | { type: 'thinking'; text: string }
   | {
@@ -18,7 +28,16 @@ export type Part =
       /** Set when the model produced arguments that are not valid JSON. */
       invalid?: string;
     }
-  | { type: 'tool_result'; id: string; name: string; output: string; isError?: boolean; server?: boolean };
+  | {
+      type: 'tool_result';
+      id: string;
+      name: string;
+      output: string;
+      isError?: boolean;
+      server?: boolean;
+      /** Images the tool returned for the model to look at. */
+      images?: ImageRef[];
+    };
 
 export interface Msg {
   role: 'user' | 'assistant';
@@ -85,5 +104,16 @@ export function textOf(msg: Msg): string {
     .join('')
     .trim();
 }
+
+/** Read an image for sending to a provider. Null when the file has gone or cannot be read. */
+export function readImage(ref: ImageRef): string | null {
+  try {
+    return fs.readFileSync(ref.path).toString('base64');
+  } catch {
+    return null;
+  }
+}
+
+export const missingImage = (ref: ImageRef) => `[An image was attached here (${path.basename(ref.path)}) but the file is no longer on disk.]`;
 
 export const EMPTY_USAGE: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };

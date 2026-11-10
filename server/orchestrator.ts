@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AppState, PmStatus, Project, Task } from '../shared/types.ts';
+import type { AppState, Attachment, PmStatus, Project, Task } from '../shared/types.ts';
+import { fileSize } from './inbox.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -101,6 +102,28 @@ function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): s
     .slice(0, 30);
   lines.push('Projects:', ...(live.length ? live.map((p) => `- ${projectSummary(p)}`) : ['- (none yet)']));
   return `<context>\n${lines.join('\n')}\n</context>`;
+}
+
+/** How a message with files reads to the manager: what arrived, where it is, and what can be done with it. */
+function attachmentBlock(list: Attachment[]): string {
+  const sees = runtimeDef(getSettings().pm.runtime).kind === 'api';
+  const lines = list.map((a) => {
+    const look = !a.image ? '' : sees ? ' — shown to you with this message' : ' — open it with your Read tool to look at it';
+    return `- ${path.basename(a.path)} (${a.mime}, ${fileSize(a.size)}), saved at ${a.path}${look}`;
+  });
+  return [
+    '<attachments>',
+    `The user sent ${list.length === 1 ? 'a file' : `${list.length} files`} with this message, now saved in the inbox on this computer:`,
+    ...lines,
+    'To let agents work with one, copy it into a project with add_file_to_project and give them the workspace path it returns.',
+    '</attachments>',
+  ].join('\n');
+}
+
+export interface ChatOptions {
+  via?: InboxItem['via'];
+  voice?: boolean;
+  attachments?: Attachment[];
 }
 
 interface PendingEvent {
@@ -438,7 +461,7 @@ export const runner = new Runner({ spec: specFor, host, onStart, onFinish, onUsa
 // ---------- the orchestrator API (used by PM tools and the HTTP layer) ----------
 
 export const orch: Orch & {
-  chat(text: string, via?: InboxItem['via'], voice?: boolean): void;
+  chat(text: string, opts?: ChatOptions): void;
   /** The user stopped a task from the dashboard; the PM should know its plan changed. */
   userCancelled(id: string): void;
   stopPm(): void;
@@ -586,6 +609,12 @@ export const orch: Orch & {
     tick();
   },
 
+  async sendFileToUser(file, caption) {
+    const sent = await telegram.sendFile(file, caption);
+    emit(PM, 'notice', { text: `Sent ${path.basename(file)} to your phone.` });
+    return sent;
+  },
+
   memoryChanged() {
     sync({ memory: memory.all() });
   },
@@ -594,8 +623,10 @@ export const orch: Orch & {
     sync({ reminders: reminders.all() });
   },
 
-  chat(text, via, voice) {
-    runner.send(PM, { from: 'user', text: `${contextBlock(true, via, voice)}\n\n${text}`, display: text, via, voice });
+  chat(text, { via, voice, attachments } = {}) {
+    const files = attachments?.length ? attachments : undefined;
+    const body = [text || (files ? '(The user sent this without a message.)' : ''), files ? attachmentBlock(files) : ''].filter(Boolean).join('\n\n');
+    runner.send(PM, { from: 'user', text: `${contextBlock(true, via, voice)}\n\n${body}`, display: text, via, voice, attachments: files });
     sync({ pm: pmStatus() });
   },
 
@@ -664,7 +695,7 @@ export const orch: Orch & {
     }
     approvals.expireAll();
     telegram.configure({
-      chat: (text, voice) => orch.chat(text, 'telegram', voice),
+      chat: (text, opts) => orch.chat(text, { via: 'telegram', ...opts }),
       stopPm: () => orch.stopPm(),
       isPmBusy: () => runner.isBusy(PM) || runner.queued(PM) > 0,
       statusText,

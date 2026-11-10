@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import type { ToolDef } from '../llm/types.ts';
+import type { ImageRef, ToolDef } from '../llm/types.ts';
+
+/** What a tool hands back: text, optionally with images for the model to look at. */
+export type ToolOutput = string | { text: string; images: ImageRef[] };
 
 /** Services the harness offers to a running agent's tools. */
 export interface Host {
@@ -25,14 +28,14 @@ export interface Tool<T = any> {
   name: string;
   description: string;
   input: z.ZodType<T>;
-  run(input: T, ctx: ToolCtx): Promise<string>;
+  run(input: T, ctx: ToolCtx): Promise<ToolOutput>;
 }
 
 export function defineTool<S extends z.ZodType>(tool: {
   name: string;
   description: string;
   input: S;
-  run(input: z.infer<S>, ctx: ToolCtx): Promise<string>;
+  run(input: z.infer<S>, ctx: ToolCtx): Promise<ToolOutput>;
 }): Tool<z.infer<S>> {
   return tool as Tool<z.infer<S>>;
 }

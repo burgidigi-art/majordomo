@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import type { Provider, ToolDef } from '../llm/types.ts';
 import { mockApi, tempHome } from './helpers.ts';
@@ -13,8 +15,11 @@ const tools: ToolDef[] = [
   { name: 'echo', description: 'Echo text', schema: { $schema: 'x', type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false } },
 ];
 
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+let home = '';
+
 before(async () => {
-  tempHome();
+  home = tempHome();
   api = await mockApi(() => ({ sse: sse(script.shift() ?? []) }));
   process.env.OPENAI_BASE_URL = api.url;
   process.env.OPENAI_API_KEY = 'test-key';
@@ -91,4 +96,20 @@ test('keeps parallel tool calls apart and rebuilds turns from another provider',
   const sent = api.requests.at(-1)!.body.messages;
   assert.deepEqual(sent[2], { role: 'assistant', content: 'ok', tool_calls: [{ id: 'toolu_9', type: 'function', function: { name: 'echo', arguments: '{"text":"z"}' } }] });
   assert.ok(!JSON.stringify(sent).includes('private'), 'another provider’s thinking is never forwarded');
+});
+
+test('sends images as data URLs, and carries tool-returned images in the following user message', async () => {
+  const file = path.join(home, 'photo.png');
+  fs.writeFileSync(file, Buffer.from(PNG, 'base64'));
+  script = [[delta({ content: 'ok' }), delta({}, 'stop')]];
+  await run([
+    { role: 'user', parts: [{ type: 'text', text: 'What is this?' }, { type: 'image', path: file, mime: 'image/png' }] },
+    { role: 'assistant', parts: [{ type: 'tool_call', id: 'call_7', name: 'view_image', input: { path: 'chart.png' } }] },
+    { role: 'user', parts: [{ type: 'tool_result', id: 'call_7', name: 'view_image', output: 'Showing chart.png', images: [{ path: file, mime: 'image/png' }] }] },
+  ]);
+  const sent = api.requests.at(-1)!.body.messages;
+  const image = { type: 'image_url', image_url: { url: `data:image/png;base64,${PNG}` } };
+  assert.deepEqual(sent[1], { role: 'user', content: [{ type: 'text', text: 'What is this?' }, image] });
+  assert.deepEqual(sent[3], { role: 'tool', tool_call_id: 'call_7', content: 'Showing chart.png' });
+  assert.deepEqual(sent[4], { role: 'user', content: [{ type: 'text', text: 'The image(s) returned by the tool call above:' }, image] });
 });

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ModelOption } from '../../shared/types.ts';
 import { getSecret } from '../settings.ts';
-import type { ChatRequest, ChatResponse, Msg, Part, Provider, StopKind } from './types.ts';
+import { missingImage, readImage, type ChatRequest, type ChatResponse, type ImageRef, type Msg, type Part, type Provider, type StopKind } from './types.ts';
 
 import Beta = Anthropic.Beta;
 
@@ -19,6 +19,12 @@ function client(): Anthropic {
 
 const safeId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+function imageBlock(ref: ImageRef): Beta.BetaImageBlockParam | Beta.BetaTextBlockParam {
+  const data = readImage(ref);
+  if (!data) return { type: 'text', text: missingImage(ref) };
+  return { type: 'image', source: { type: 'base64', media_type: ref.mime as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data } };
+}
+
 function toParams(messages: Msg[], runtimeIsAnthropic: (m: Msg) => boolean, floor: number): Beta.BetaMessageParam[] {
   const out: Beta.BetaMessageParam[] = [];
   messages.forEach((msg, index) => {
@@ -29,11 +35,15 @@ function toParams(messages: Msg[], runtimeIsAnthropic: (m: Msg) => boolean, floo
           content.push({
             type: 'tool_result',
             tool_use_id: safeId(p.id),
-            content: p.output || '(no output)',
+            content: p.images?.length
+              ? [{ type: 'text', text: p.output || '(no output)' }, ...p.images.map(imageBlock)]
+              : p.output || '(no output)',
             is_error: p.isError || undefined,
           });
         }
       }
+      // Images go ahead of the text that talks about them.
+      for (const p of msg.parts) if (p.type === 'image') content.push(imageBlock(p));
       for (const p of msg.parts) if (p.type === 'text' && p.text) content.push({ type: 'text', text: p.text });
       if (content.length) out.push({ role: 'user', content });
       return;

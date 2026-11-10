@@ -50,7 +50,7 @@ async function handle(msg: any): Promise<object | null> {
       }
       try {
         const out = await tool.run(parsed.data, { agentId: 'pm', cwd: process.cwd(), signal: new AbortController().signal, host: noHost });
-        return text(out);
+        return text(typeof out === 'string' ? out : out.text);
       } catch (err) {
         return text(err instanceof ToolError ? err.message : describeError(err), true);
       }
