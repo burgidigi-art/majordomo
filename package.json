@@ -1,0 +1,49 @@
+{
+  "name": "majordomo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personal project-manager agent harness: talk to one agent, it runs the crew.",
+  "bin": {
+    "majordomo": "./bin/majordomo.mjs"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c magenta,cyan \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "node bin/majordomo.mjs",
+    "demo": "MAJORDOMO_DEMO=1 node bin/majordomo.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
+    "test": "tsx --test server/test/*.test.ts"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.7.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@hono/node-server": "^2.1.6",
+    "better-sqlite3": "^13.0.3",
+    "hono": "^4.13.17",
+    "lucide-react": "^1.71.0",
+    "openai": "^7.55.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}
