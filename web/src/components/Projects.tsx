@@ -32,6 +32,60 @@ function ProgressBar({ c }: { c: ReturnType<typeof counts> }) {
 
 // ---------- list ----------
 
+export function ProjectCard({ project: p, now }: { project: Project; now: number }) {
+  const all = useStore((s) => s.app?.tasks);
+  const tasks = useMemo(() => (all ?? []).filter((t) => t.projectId === p.id), [all, p.id]);
+  const c = counts(tasks);
+  const workers = tasks.filter(isLive).slice(0, 5);
+  return (
+    <a
+      href={`#/projects/${p.id}`}
+      className="card proj-card"
+      style={{ ['--hue' as string]: p.hue, color: 'inherit', textDecoration: 'none', opacity: p.status === 'archived' ? 0.6 : 1 }}
+    >
+      <div className="row">
+        <span className="chip">{p.id}</span>
+        {p.status !== 'active' && <span className="pill">{p.status}</span>}
+        <span className="grow" />
+        <span className="faint" style={{ fontSize: 12 }}>
+          {ago(p.updatedAt, now)}
+        </span>
+      </div>
+      <h3>{p.name}</h3>
+      <div className="goal">{p.goal || 'No goal recorded yet.'}</div>
+      <ProgressBar c={c} />
+      <div className="row">
+        <div className="counts grow">
+          <span>
+            <b>{c.done}</b>/{c.total} done
+          </span>
+          {c.running > 0 && (
+            <span style={{ color: 'var(--accent)' }}>
+              <b style={{ color: 'inherit' }}>{c.running}</b> working
+            </span>
+          )}
+          {c.waiting > 0 && (
+            <span style={{ color: 'var(--attn)' }}>
+              <b style={{ color: 'inherit' }}>{c.waiting}</b> waiting
+            </span>
+          )}
+          {c.failed > 0 && (
+            <span style={{ color: 'var(--bad)' }}>
+              <b style={{ color: 'inherit' }}>{c.failed}</b> failed
+            </span>
+          )}
+        </div>
+        <div className="row" style={{ gap: 4 }}>
+          {workers.map((t) => (
+            <TaskAvatar key={t.id} task={t} small />
+          ))}
+        </div>
+      </div>
+    </a>
+  );
+}
+
+
 function NewProject({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
@@ -100,62 +154,13 @@ export function Projects() {
         {adding && <NewProject onDone={() => setAdding(false)} />}
         {list.length === 0 && !adding ? (
           <Empty title="No projects yet">
-            Tell your manager what you are working on and it will set one up. <a href="#/">Go to the desk</a>
+            Tell your manager what you are working on and it will set one up. <a href="#/chat">Open the chat</a>
           </Empty>
         ) : (
           <div className="proj-grid">
-            {list.map((p) => {
-              const tasks = app.tasks.filter((t) => t.projectId === p.id);
-              const c = counts(tasks);
-              const workers = tasks.filter(isLive).slice(0, 5);
-              return (
-                <a
-                  key={p.id}
-                  href={`#/projects/${p.id}`}
-                  className="card proj-card"
-                  style={{ ['--hue' as string]: p.hue, color: 'inherit', textDecoration: 'none', opacity: p.status === 'archived' ? 0.6 : 1 }}
-                >
-                  <div className="row">
-                    <span className="chip">{p.id}</span>
-                    {p.status !== 'active' && <span className="pill">{p.status}</span>}
-                    <span className="grow" />
-                    <span className="faint" style={{ fontSize: 12 }}>
-                      {ago(p.updatedAt, now)}
-                    </span>
-                  </div>
-                  <h3>{p.name}</h3>
-                  <div className="goal">{p.goal || 'No goal recorded yet.'}</div>
-                  <ProgressBar c={c} />
-                  <div className="row">
-                    <div className="counts grow">
-                      <span>
-                        <b>{c.done}</b>/{c.total} done
-                      </span>
-                      {c.running > 0 && (
-                        <span style={{ color: 'var(--accent)' }}>
-                          <b style={{ color: 'inherit' }}>{c.running}</b> working
-                        </span>
-                      )}
-                      {c.waiting > 0 && (
-                        <span style={{ color: 'var(--attn)' }}>
-                          <b style={{ color: 'inherit' }}>{c.waiting}</b> waiting
-                        </span>
-                      )}
-                      {c.failed > 0 && (
-                        <span style={{ color: 'var(--bad)' }}>
-                          <b style={{ color: 'inherit' }}>{c.failed}</b> failed
-                        </span>
-                      )}
-                    </div>
-                    <div className="row" style={{ gap: 4 }}>
-                      {workers.map((t) => (
-                        <TaskAvatar key={t.id} task={t} small />
-                      ))}
-                    </div>
-                  </div>
-                </a>
-              );
-            })}
+            {list.map((p) => (
+              <ProjectCard key={p.id} project={p} now={now} />
+            ))}
           </div>
         )}
       </div>
@@ -201,7 +206,7 @@ function Board({ tasks }: { tasks: Task[] }) {
   if (!top.length) {
     return (
       <Empty title="No tasks yet">
-        Ask your manager to get started on this project. <a href="#/">Go to the desk</a>
+        Ask your manager to get started on this project. <a href="#/chat">Open the chat</a>
       </Empty>
     );
   }

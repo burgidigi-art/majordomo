@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { RuntimeInfo, Task, TaskStatus } from '../../shared/types.ts';
+import type { RuntimeId, RuntimeInfo, Task, TaskStatus } from '../../shared/types.ts';
 
 export function compact(n: number): string {
   if (n < 1000) return String(n);
@@ -83,6 +83,23 @@ export function taskElapsed(t: Task, now: number): number {
 
 export function familyOf(runtimes: RuntimeInfo[], id: string): RuntimeInfo['family'] {
   return runtimes.find((r) => r.id === id)?.family ?? 'demo';
+}
+
+const ACCOUNT_NAMES: Record<RuntimeId, string> = {
+  'claude-code': 'Claude',
+  anthropic: 'Claude API',
+  codex: 'ChatGPT',
+  openai: 'OpenAI',
+  'gemini-cli': 'Gemini',
+  gemini: 'Gemini API',
+  muse: 'Muse',
+  openrouter: 'OpenRouter',
+  demo: 'Demo crew',
+};
+
+/** A short name for an account, for places too tight for "Claude · subscription". */
+export function accountName(id: RuntimeId): string {
+  return ACCOUNT_NAMES[id] ?? id;
 }
 
 /** Tool names arrive with transport prefixes when the PM runs through a CLI. */

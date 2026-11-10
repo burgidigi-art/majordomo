@@ -443,8 +443,12 @@ function Phone() {
 
 // ---------- page ----------
 
-export function Settings() {
+export function Settings({ section }: { section?: string }) {
   const app = useStore((s) => s.app)!;
+  // The sidebar links straight to a part of this page (#/settings/crew and so on).
+  useEffect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ block: 'start' });
+  }, [section]);
   const [draft, setDraft] = useState<SettingsT>(app.settings);
   const [saving, setSaving] = useState(false);
 
@@ -488,7 +492,7 @@ export function Settings() {
           </div>
         </div>
 
-        <section className="section">
+        <section className="section" id="accounts">
           <h2>Accounts</h2>
           <p>
             Subscriptions are used through each vendor’s own command-line agent, which holds your login — sign in once in a terminal and
@@ -501,7 +505,7 @@ export function Settings() {
           </div>
         </section>
 
-        <section className="section">
+        <section className="section" id="phone">
           <h2>Phone</h2>
           <p>
             Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. Voice notes, photos and
@@ -511,7 +515,7 @@ export function Settings() {
           <Phone />
         </section>
 
-        <section className="section">
+        <section className="section" id="manager">
           <h2>Project manager</h2>
           <p>The one agent you talk to. It plans, delegates and reports — pick your most capable model here.</p>
           <div className="card" style={{ padding: 16 }}>
@@ -543,7 +547,7 @@ export function Settings() {
           </div>
         </section>
 
-        <section className="section">
+        <section className="section" id="crew">
           <h2>Crew</h2>
           <p>
             The agents your manager can assign work to. Describe what each is good at — the manager reads this to decide who gets which task. Mix
@@ -603,7 +607,7 @@ export function Settings() {
           </div>
         </section>
 
-        <section className="section">
+        <section className="section" id="agents">
           <h2>How agents work</h2>
           <p>Agents run on this computer, inside each project’s workspace folder.</p>
           <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -647,45 +651,6 @@ export function Settings() {
               </div>
             </div>
           </div>
-        </section>
-
-        <section className="section">
-          <h2>What the manager remembers</h2>
-          <p>Lasting facts about you and how you like things done. The manager adds these itself; remove any that are wrong.</p>
-          <div className="card">
-            {app.memory.length === 0 ? (
-              <div className="list-row hint">Nothing yet. Tell the manager a preference and it will keep it.</div>
-            ) : (
-              app.memory.map((m) => (
-                <div key={m.id} className="list-row">
-                  <span className="chip">{m.id}</span>
-                  <span className="grow">{m.text}</span>
-                  <button className="icon-btn" aria-label="Forget" onClick={() => void attempt(() => api.forget(m.id))}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          {app.reminders.length > 0 && (
-            <div className="card" style={{ marginTop: 12 }}>
-              {app.reminders.map((r) => (
-                <div key={r.id} className="list-row">
-                  <span className="chip">{r.id}</span>
-                  <span className="grow">
-                    {r.note}
-                    <div className="hint">
-                      {new Date(r.dueAt).toLocaleString()}
-                      {r.repeatMinutes ? ` · repeats every ${r.repeatMinutes} min` : ''}
-                    </div>
-                  </span>
-                  <button className="icon-btn" aria-label="Cancel reminder" onClick={() => void attempt(() => api.cancelReminder(r.id))}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         <section className="section">

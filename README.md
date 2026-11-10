@@ -6,7 +6,7 @@ You talk to **one** agent. Tell it about anything you are working on — a featu
 records the project, breaks it into tasks, hands each task to a worker agent, tracks them, checks the results, and
 reports back. You never juggle threads. A dashboard shows every project, task and agent live.
 
-![The desk: chat with the manager on the left, the live crew on the right](docs/desk.png)
+![The dashboard: account usage, where work is flowing right now, and what needs you](docs/dashboard.png)
 
 It runs on your own machine and uses the AI accounts you already have: **Claude, OpenAI/ChatGPT, Gemini, Meta Muse
 and OpenRouter**, in any mix.
@@ -66,7 +66,7 @@ command while you are away from the computer.
 
 ![The Phone panel in Settings, linked and ready](docs/phone.png)
 
-From then on, just write to the bot as you would at the desk. It is the same conversation: what you send from the
+From then on, just write to the bot as you would in the chat. It is the same conversation: what you send from the
 phone shows up in the dashboard, marked *sent from Telegram*.
 
 - **Replies** to what you send from the phone always come back to the phone.
@@ -111,7 +111,7 @@ and announced to the manager. Several photos sent together arrive as one message
 - **Files come back too.** Ask for a deliverable — "send me the report" — and the manager sends it to your phone:
   images as photos, everything else as a document.
 
-![A photo and a PDF sent from Telegram, as they appear at the desk](docs/phone-files.png)
+![A photo and a PDF sent from Telegram, as they appear in the chat](docs/phone-files.png)
 
 In the dashboard, photos show as thumbnails in the chat and other files as download chips. Limits are Telegram's:
 bots can fetch files up to 20 MB and send files up to 50 MB. Pictures over about 4.5 MB are kept as files but not
@@ -145,13 +145,26 @@ files you send in, and one workspace folder per project. A project can instead p
 
 ## What you can see and do
 
-- **Desk** — chat with the manager; the crew panel shows who is working, on what, for how long, and anything waiting
+- **Dashboard** — the home screen. Usage orbs for the accounts in use, a live picture of where work is flowing, and
+  the state of your projects at a glance.
+  - *Usage orbs.* A Claude subscription reports its own allowance, so that orb shows the real share of your weekly
+    limit used (with the 5-hour window and reset day beneath it). Accounts that do not report a limit show their
+    share of the week's tokens instead, and say so.
+  - *Work flow.* A stream runs from your work to each connected account and each crew member. It glitters and
+    moves while an agent is actually working there, and fades to a trickle when idle. The two controls beside it
+    are real settings: whether shell commands run freely or ask first, and how many agents work at once.
+- **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type
   to steer it mid-task, answer its question, or ask a finished agent for a follow-up. Stop or retry from there.
 - **Projects** — a board of each project's tasks, a browser for the files agents produced, and the goal and notes.
 - **Activity** — a timeline of every agent across all projects, with tokens and cost per account.
+- **Memory** — what the manager has saved about you, and the reminders it has set for itself.
 - **Your phone** — the same manager over Telegram; see below.
+
+![Chat with the manager, with the live crew alongside](docs/desk.png)
+
+Dark and light themes are both included; the switch is in the top bar.
 
 ## Safety
 
@@ -198,8 +211,9 @@ server/
   gateways/transcribe.ts  speech-to-text for voice notes: OpenAI, Gemini, or a local command
   inbox.ts            where photos and files sent in from the phone are kept
   mcp.ts              serves the manager's tools to a CLI-hosted manager over MCP
+  limits.ts           plan usage as reported by the subscription CLIs (feeds the usage orbs)
   http.ts             REST + server-sent events + the built dashboard
-web/src/              React dashboard
+web/src/              React dashboard (components/Dashboard.tsx and Flow.tsx are the home screen)
 shared/types.ts       types shared by both
 ```
 

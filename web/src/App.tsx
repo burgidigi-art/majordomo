@@ -1,20 +1,60 @@
-import { Activity as ActivityIcon, BellRing, FolderKanban, MessageSquareText, Moon, Settings as SettingsIcon, Sun } from 'lucide-react';
+import {
+  Activity as ActivityIcon,
+  BellRing,
+  Brain,
+  FolderKanban,
+  KeyRound,
+  LayoutDashboard,
+  MessageSquareText,
+  PanelRight,
+  Settings as SettingsIcon,
+  Smartphone,
+  Square,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect } from 'react';
+import { api } from './api.ts';
 import { Activity } from './components/Activity.tsx';
 import { AgentDrawer } from './components/AgentDrawer.tsx';
 import { CrewRail } from './components/CrewRail.tsx';
+import { Dashboard } from './components/Dashboard.tsx';
 import { Desk } from './components/Desk.tsx';
+import { Memory } from './components/Memory.tsx';
 import { ProjectDetail, Projects } from './components/Projects.tsx';
 import { Settings } from './components/Settings.tsx';
-import { Toaster } from './components/ui.tsx';
-import { isLive, useHashRoute } from './lib.ts';
+import { attempt, Toaster } from './components/ui.tsx';
+import { accountName, isLive, useHashRoute } from './lib.ts';
 import { connect, useStore } from './store.ts';
+
+type Section = 'dashboard' | 'chat' | 'projects' | 'activity' | 'memory' | 'settings';
+
+function sectionOf(route: string): Section {
+  if (route.startsWith('/chat')) return 'chat';
+  if (route.startsWith('/projects')) return 'projects';
+  if (route.startsWith('/activity')) return 'activity';
+  if (route.startsWith('/memory')) return 'memory';
+  if (route.startsWith('/settings')) return 'settings';
+  return 'dashboard';
+}
+
+function NavLink({ href, icon: Icon, label, active, count, hot }: { href: string; icon: LucideIcon; label: string; active: boolean; count?: string; hot?: boolean }) {
+  return (
+    <a href={href} className={`nav-item${active ? ' active' : ''}`} aria-current={active ? 'page' : undefined} title={label}>
+      <Icon size={16} />
+      <span>{label}</span>
+      {count ? <span className={`count${hot ? ' hot' : ''}`}>{count}</span> : null}
+    </a>
+  );
+}
 
 export function App() {
   const app = useStore((s) => s.app);
   const connected = useStore((s) => s.connected);
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
+  const railOpen = useStore((s) => s.railOpen);
+  const setRailOpen = useStore((s) => s.setRailOpen);
   const [route] = useHashRoute();
 
   useEffect(() => {
@@ -35,84 +75,132 @@ export function App() {
     );
   }
 
+  const section = sectionOf(route);
   const projectId = /^\/projects\/([^/]+)/.exec(route)?.[1];
-  const section = route === '/' ? 'desk' : route.startsWith('/projects') ? 'projects' : route.startsWith('/activity') ? 'activity' : route.startsWith('/settings') ? 'settings' : 'desk';
-  const needsYou = app.tasks.filter((t) => t.status === 'waiting').length;
-  const projects = app.projects.filter((p) => p.status === 'active' || p.status === 'paused');
+  const settingsPart = /^\/settings\/([\w-]+)/.exec(route)?.[1];
+  const project = projectId ? app.projects.find((p) => p.id === projectId) : undefined;
+  const waiting = app.tasks.filter((t) => t.status === 'waiting').length;
+  const projects = app.projects.filter((p) => p.status === 'active' || p.status === 'paused').length;
+  const name = app.settings.userName.trim();
+
+  const here =
+    section === 'projects' && project
+      ? project.name
+      : section === 'chat'
+        ? `chat · ${accountName(app.settings.pm.runtime)}${app.settings.pm.model ? ` ${app.settings.pm.model}` : ''}`
+        : section;
+  const managerLine = app.pm.busy ? 'Live · Thinking' : live ? `Live · ${live} at work` : waiting ? 'Waiting on you' : 'Standing by';
 
   return (
-    <div className={`shell${section === 'desk' ? ' with-rail' : ''}`}>
+    <div className={`shell${section === 'chat' ? ' with-rail' : ''}`}>
       <nav className="sidebar" aria-label="Main">
-        <a href="#/" className="brand" style={{ color: 'inherit', textDecoration: 'none' }}>
+        <a href="#/" className="brand">
           <span className="brand-mark">
-            <BellRing size={16} />
+            <BellRing size={17} />
           </span>
-          <span className="brand-name">Majordomo</span>
+          <span className="brand-text">
+            <div className="brand-name">Majordomo</div>
+            <div className="brand-tag">Your crew, managed</div>
+          </span>
         </a>
+
+        <div className="side-label">Workspace</div>
         <div className="nav">
-          <a href="#/" className={`nav-item${section === 'desk' ? ' active' : ''}`} style={{ textDecoration: 'none' }}>
-            <MessageSquareText size={16} />
-            <span>Desk</span>
-            {needsYou > 0 && <span className="count hot">{needsYou} waiting</span>}
-          </a>
-          <a href="#/projects" className={`nav-item${section === 'projects' ? ' active' : ''}`} style={{ textDecoration: 'none' }}>
-            <FolderKanban size={16} />
-            <span>Projects</span>
-            <span className="count">{projects.length || ''}</span>
-          </a>
-          <a href="#/activity" className={`nav-item${section === 'activity' ? ' active' : ''}`} style={{ textDecoration: 'none' }}>
-            <ActivityIcon size={16} />
-            <span>Activity</span>
-            {live > 0 && <span className="count hot">{live} live</span>}
-          </a>
-          <a href="#/settings" className={`nav-item${section === 'settings' ? ' active' : ''}`} style={{ textDecoration: 'none' }}>
-            <SettingsIcon size={16} />
-            <span>Settings</span>
-          </a>
+          <NavLink href="#/" icon={LayoutDashboard} label="Dashboard" active={section === 'dashboard'} />
+          <NavLink href="#/chat" icon={MessageSquareText} label="Chat" active={section === 'chat'} count={waiting ? `${waiting} waiting` : undefined} hot />
+          <NavLink href="#/projects" icon={FolderKanban} label="Projects" active={section === 'projects'} count={projects ? String(projects) : undefined} />
+          <NavLink href="#/activity" icon={ActivityIcon} label="Activity" active={section === 'activity'} count={live ? `${live} live` : undefined} hot />
+          <NavLink href="#/memory" icon={Brain} label="Memory" active={section === 'memory'} count={app.memory.length ? String(app.memory.length) : undefined} />
         </div>
 
-        <div className="side-label">Projects</div>
-        <div className="side-projects">
-          {projects.length === 0 && <div className="hint" style={{ padding: '2px 10px' }}>None yet</div>}
-          {projects.map((p) => {
-            const working = app.tasks.filter((t) => t.projectId === p.id && isLive(t)).length;
-            return (
-              <a
-                key={p.id}
-                href={`#/projects/${p.id}`}
-                className={`side-project${projectId === p.id ? ' active' : ''}`}
-                style={{ ['--hue' as string]: p.hue, textDecoration: 'none' }}
+        <a href="#/chat" className="mgr-widget" aria-label={`Project manager: ${managerLine}. Open chat.`}>
+          <span className={`mgr-orb${app.pm.busy ? ' busy' : ''}`} />
+          <span className="mgr-status">{managerLine}</span>
+          <span className="mgr-sub">Your manager · {accountName(app.settings.pm.runtime)}</span>
+          <span className="mgr-actions">
+            <span className="icon-btn" title="Open chat">
+              <MessageSquareText size={13} />
+            </span>
+            {app.pm.busy && (
+              <button
+                className="icon-btn"
+                title="Stop the manager"
+                aria-label="Stop the manager"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void attempt(() => api.stopPm());
+                }}
               >
-                <span className="proj-dot" />
-                <span className="grow truncate">{p.name}</span>
-                {working > 0 && (
-                  <span className="pill running" style={{ height: 18, padding: '0 6px' }}>
-                    <span className="dot" />
-                    {working}
-                  </span>
-                )}
-              </a>
-            );
-          })}
+                <Square size={11} fill="currentColor" />
+              </button>
+            )}
+          </span>
+        </a>
+
+        <div className="side-label">Tools</div>
+        <div className="nav">
+          <NavLink href="#/settings/crew" icon={Users} label="Crew" active={section === 'settings' && settingsPart === 'crew'} count={String(app.settings.crew.length)} />
+          <NavLink href="#/settings/accounts" icon={KeyRound} label="Accounts" active={section === 'settings' && settingsPart === 'accounts'} />
+          <NavLink
+            href="#/settings/phone"
+            icon={Smartphone}
+            label="Phone"
+            active={section === 'settings' && settingsPart === 'phone'}
+            count={app.telegram.connected && app.telegram.chats.length ? 'on' : undefined}
+          />
         </div>
 
+        <div className="side-spacer" />
+        <div className="nav">
+          <NavLink href="#/settings" icon={SettingsIcon} label="Settings" active={section === 'settings' && !settingsPart} />
+        </div>
         <div className="side-foot">
-          <span className={`conn${connected ? '' : ' off'}`} title={connected ? 'Connected' : 'Reconnecting…'} />
-          <span className="grow">{connected ? `v${app.version}` : 'Reconnecting…'}</span>
-          <button className="icon-btn" onClick={toggleTheme} aria-label="Switch theme" title="Switch theme">
-            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
+          <span className="profile-avatar">{(name[0] ?? 'Y').toUpperCase()}</span>
+          <span className="grow">
+            <div className="profile-name truncate">{name || 'You'}</div>
+            <div className="profile-tag">Personal · v{app.version}</div>
+          </span>
         </div>
       </nav>
 
       <main className="main">
-        {section === 'desk' && <Desk />}
+        <header className="topbar">
+          <div className="crumbs">
+            <span className="root">Majordomo</span>
+            <span className="sep">/</span>
+            <span className="here truncate">{here}</span>
+            <span className={`conn${connected ? '' : ' off'}`} title={connected ? 'Connected' : 'Reconnecting…'} />
+          </div>
+          <span className="grow" />
+          {section !== 'chat' && (
+            <a className="top-btn" href="#/chat">
+              <MessageSquareText size={15} />
+              <span>Chat</span>
+            </a>
+          )}
+          {section === 'chat' ? (
+            <button className={`top-btn only-narrow${live ? ' hot' : ''}`} onClick={() => setRailOpen(!railOpen)}>
+              <PanelRight size={15} />
+              <span>Crew{live ? ` · ${live}` : ''}</span>
+            </button>
+          ) : (
+            <a className={`top-btn${live ? ' hot' : ''}`} href="#/activity">
+              <ActivityIcon size={15} />
+              <span>{live ? `${live} live` : 'Activity'}</span>
+            </a>
+          )}
+          <button className={`theme-switch ${theme}`} onClick={toggleTheme} role="switch" aria-checked={theme === 'dark'} aria-label="Dark theme" title="Switch theme" />
+        </header>
+
+        {section === 'dashboard' && <Dashboard />}
+        {section === 'chat' && <Desk />}
         {section === 'projects' && (projectId ? <ProjectDetail id={projectId} /> : <Projects />)}
         {section === 'activity' && <Activity />}
-        {section === 'settings' && <Settings />}
+        {section === 'memory' && <Memory />}
+        {section === 'settings' && <Settings section={settingsPart} />}
       </main>
 
-      {section === 'desk' && <CrewRail />}
+      {section === 'chat' && <CrewRail />}
       <AgentDrawer />
       <Toaster />
     </div>

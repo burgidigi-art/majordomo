@@ -1,8 +1,8 @@
-import { ArrowUp, FlaskConical, PanelRight, Square } from 'lucide-react';
+import { ArrowUp, FlaskConical, Square } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { AgentEvent } from '../../../shared/types.ts';
 import { api } from '../api.ts';
-import { greeting, isLive } from '../lib.ts';
+import { greeting } from '../lib.ts';
 import { useStore, type StreamingBlock } from '../store.ts';
 import { Transcript } from './Transcript.tsx';
 import { attempt } from './ui.tsx';
@@ -41,8 +41,6 @@ export function Desk() {
   const loaded = useStore((s) => !!s.loaded.pm);
   const streaming = useStore((s) => s.streaming.pm ?? NO_STREAM);
   const loadEvents = useStore((s) => s.loadEvents);
-  const setRailOpen = useStore((s) => s.setRailOpen);
-  const railOpen = useStore((s) => s.railOpen);
 
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
@@ -70,26 +68,11 @@ export function Desk() {
     if (!ok) setDraft(clean);
   };
 
-  const live = app.tasks.filter(isLive).length;
-  const pmRuntime = app.runtimes.find((r) => r.id === app.settings.pm.runtime);
   const empty = loaded && events.length === 0 && !app.pm.busy;
   const hasLiveText = Object.keys(streaming).length > 0;
 
   return (
     <div className="desk">
-      <div className="desk-top">
-        <h1>Your project manager</h1>
-        <span className="faint truncate" style={{ fontSize: 12.5 }}>
-          {pmRuntime?.label}
-          {app.settings.pm.model ? ` · ${app.settings.pm.model}` : ''}
-        </span>
-        <span className="grow" />
-        <button className="btn ghost sm only-narrow" onClick={() => setRailOpen(!railOpen)}>
-          <PanelRight size={14} />
-          Crew{live ? ` · ${live}` : ''}
-        </button>
-      </div>
-
       {app.demo && (
         <div className="banner">
           <FlaskConical size={15} />

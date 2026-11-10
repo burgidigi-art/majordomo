@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import type { Effort, RuntimeId } from '../../shared/types.ts';
 import { emit, emitDelta } from '../bus.ts';
+import { recordClaudeLimits } from '../limits.ts';
 import { EMPTY_USAGE, type Usage } from '../llm/types.ts';
 import { CLI_BIN, getSettings } from '../settings.ts';
 
@@ -100,6 +101,9 @@ const claude: Driver = {
     switch (line.type) {
       case 'system':
         if (line.subtype === 'init' && line.session_id) s.session = line.session_id;
+        break;
+      case 'rate_limit_event':
+        recordClaudeLimits(line.rate_limit_info);
         break;
       case 'stream_event': {
         if (line.parent_tool_use_id) break;

@@ -127,3 +127,29 @@ test('the dashboard is told the manager is idle once it finishes', async () => {
   stop();
   assert.equal(seen.at(-1), false, 'the last status pushed to clients says not busy');
 });
+
+test('plan usage reported by Claude Code is recorded and pushed to the dashboard', async () => {
+  const { recordClaudeLimits, getLimits } = await import('../limits.ts');
+  const { subscribe } = await import('../bus.ts');
+  let pushed: any = null;
+  const stop = subscribe((m) => {
+    if (m.kind === 'sync' && m.patch.limits) pushed = m.patch.limits;
+  });
+  recordClaudeLimits({
+    status: 'allowed',
+    rateLimitType: 'five_hour',
+    unifiedWindows: {
+      five_hour: { utilization: 0.45, resetsAt: 1794339600, status: 'allowed' },
+      seven_day: { utilization: 0.05, resetsAt: 1794927600, status: 'allowed' },
+    },
+  });
+  recordClaudeLimits({ status: 'allowed' });
+  recordClaudeLimits(undefined);
+  stop();
+  const saved = getLimits()['claude-code']!;
+  assert.deepEqual(saved.weekly, { used: 0.05, resetsAt: 1794927600000 });
+  assert.deepEqual(saved.session, { used: 0.45, resetsAt: 1794339600000 });
+  assert.deepEqual(pushed['claude-code'].weekly, saved.weekly);
+  const state: any = await (await app.request('/api/state', { headers: local })).json();
+  assert.equal(state.limits['claude-code'].weekly.used, 0.05);
+});

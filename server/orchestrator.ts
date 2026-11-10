@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AppState, Attachment, PmStatus, Project, Task } from '../shared/types.ts';
 import { fileSize } from './inbox.ts';
+import { getLimits } from './limits.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -680,6 +681,7 @@ export const orch: Orch & {
       reminders: reminders.all(),
       pm: pmStatus(),
       telegram: telegram.status(),
+      limits: getLimits(),
       demo: DEMO || getSettings().pm.runtime === 'demo',
       version: VERSION,
     };

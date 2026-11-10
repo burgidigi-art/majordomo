@@ -210,6 +210,15 @@ export interface TelegramStatus {
   voice: VoiceStatus;
 }
 
+/** How much of a subscription's allowance is used, as a fraction from 0 to 1. */
+export interface AccountLimits {
+  weekly?: { used: number; resetsAt: number };
+  /** The short rolling window (five hours on Claude plans). */
+  session?: { used: number; resetsAt: number };
+  /** When these figures were last reported. */
+  at: number;
+}
+
 export interface AppState {
   settings: Settings;
   runtimes: RuntimeInfo[];
@@ -220,6 +229,7 @@ export interface AppState {
   reminders: Reminder[];
   pm: PmStatus;
   telegram: TelegramStatus;
+  limits: Partial<Record<RuntimeId, AccountLimits>>;
   demo: boolean;
   version: string;
 }
