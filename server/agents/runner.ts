@@ -16,6 +16,8 @@ export interface InboxItem {
   display?: string;
   /** The channel a user message arrived on, when it was not the dashboard. */
   via?: 'telegram';
+  /** The text is a transcription of something the user said aloud. */
+  voice?: boolean;
 }
 
 export interface AgentSpec {
@@ -122,7 +124,7 @@ export class Runner {
       while (this.queued(id)) {
         const spec = this.hooks.spec(id);
         const items = this.take(id);
-        for (const it of items) emit(id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via });
+        for (const it of items) emit(id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via, voice: it.voice });
         text =
           runtimeDef(spec.runtime).kind === 'cli'
             ? await this.cliTurn(spec, items, signal)
@@ -272,7 +274,7 @@ export class Runner {
       // after the tool results, so the history stays append-only.
       const late = this.take(spec.id);
       for (const it of late) {
-        emit(spec.id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via });
+        emit(spec.id, 'user', { from: it.from, text: it.display ?? it.text, via: it.via, voice: it.voice });
         // A message folded in mid-turn is answered by this turn's reply, so it counts as a prompt for it.
         items.push(it);
       }

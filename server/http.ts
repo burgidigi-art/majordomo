@@ -3,7 +3,7 @@ import { streamSSE } from 'hono/streaming';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMessage } from '../shared/types.ts';
+import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMessage, VoiceSettings } from '../shared/types.ts';
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
 import { events, memory, projects, reminders, tasks } from './db.ts';
@@ -213,7 +213,8 @@ app.get('/api/projects/:id/file', async (c) => {
 
 async function pushSettings(): Promise<void> {
   const state = await orch.state();
-  sync({ settings: state.settings, runtimes: state.runtimes, demo: state.demo });
+  // Telegram's status rides along: saving or removing a key changes what can transcribe voice notes.
+  sync({ settings: state.settings, runtimes: state.runtimes, demo: state.demo, telegram: state.telegram });
 }
 
 app.put('/api/settings', async (c) => {
@@ -323,8 +324,9 @@ app.post('/api/setup/adopt', async (c) => {
 // ---------- phone (Telegram) ----------
 
 app.put('/api/telegram', async (c) => {
-  const body = await c.req.json<{ token?: string; notify?: boolean }>();
+  const body = await c.req.json<{ token?: string; notify?: boolean; voice?: Partial<VoiceSettings> }>();
   if (typeof body.notify === 'boolean') telegram.setNotify(body.notify);
+  if (body.voice && typeof body.voice === 'object') telegram.setVoice(body.voice);
   if (typeof body.token === 'string') {
     const token = body.token.trim();
     // A bot token looks like 123456789:AA…; catch a mis-paste before it becomes a confusing error.

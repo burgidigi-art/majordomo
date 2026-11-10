@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import type { Approval, TelegramChat, TelegramStatus } from '../../shared/types.ts';
+import type { Approval, TelegramChat, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 import { subscribe, sync } from '../bus.ts';
 import { kvGet, kvSet } from '../db.ts';
 import { getTelegramToken, setTelegramToken } from '../settings.ts';
+import { resolveVoice, saveVoiceSettings, transcribe, voiceStatus } from './transcribe.ts';
 
 /**
  * Telegram gateway: message the project manager from a phone.
@@ -13,8 +14,8 @@ import { getTelegramToken, setTelegramToken } from '../settings.ts';
  */
 
 export interface TelegramDeps {
-  /** Hand a message from the phone to the project manager. */
-  chat(text: string): void;
+  /** Hand a message from the phone to the project manager. `voice` marks a transcribed voice note. */
+  chat(text: string, voice?: boolean): void;
   stopPm(): void;
   isPmBusy(): boolean;
   /** A short Markdown summary of what is running, for /status. */
@@ -86,7 +87,7 @@ export function chunk(text: string, max = 3500): string[] {
 const HELP = [
   '**Majordomo** — your project manager, on your phone.',
   '',
-  'Just write to me like you would at the desk: describe a project, ask where something stands, change your mind.',
+  'Just write to me like you would at the desk: describe a project, ask where something stands, change your mind. Voice notes work too.',
   '',
   '/status — what the crew is doing right now',
   '/stop — stop the manager mid-reply',
@@ -152,6 +153,7 @@ class TelegramGateway {
       pairCode: this.pairCode,
       chats: this.chats,
       notify: this.notify,
+      voice: voiceStatus(),
     };
   }
 
@@ -169,6 +171,11 @@ class TelegramGateway {
 
   setNotify(on: boolean): void {
     kvSet('telegram:notify', on);
+    this.push();
+  }
+
+  setVoice(next: Partial<VoiceSettings>): void {
+    saveVoiceSettings(next);
     this.push();
   }
 
@@ -317,8 +324,10 @@ class TelegramGateway {
       return;
     }
 
+    const audio = m.voice ?? m.audio;
+    if (audio) return this.handleVoice(chatId, audio, typeof m.caption === 'string' ? m.caption.trim() : '');
     if (!text) {
-      await this.send(chatId, 'I can only read text messages for now.');
+      await this.send(chatId, 'I can read text and voice notes, but not photos, videos or files yet.');
       return;
     }
     const command = /^\/(\w+)(?:@\w+)?/.exec(text)?.[1]?.toLowerCase();
@@ -343,6 +352,59 @@ class TelegramGateway {
         this.deps?.chat(text);
         this.showTyping(chatId);
     }
+  }
+
+  /** A voice note: fetch it, transcribe it, show what was heard, then pass it on like a typed message. */
+  private async handleVoice(chatId: number, audio: any, caption: string): Promise<void> {
+    const { backend, problem } = resolveVoice();
+    if (!backend) {
+      await this.send(chatId, `I can't listen to voice notes yet. ${problem} You can set this up in Majordomo under Settings → Phone → Voice notes.`);
+      return;
+    }
+    // Telegram lets a bot download files up to 20 MB.
+    if ((audio.file_size ?? 0) > 20 * 1024 * 1024) {
+      await this.send(chatId, 'That recording is too large for me to fetch (Telegram’s limit for bots is 20 MB). Try a shorter one.');
+      return;
+    }
+    void this.call('sendChatAction', { chat_id: chatId, action: 'typing' }).catch(() => {});
+
+    let heard: string;
+    try {
+      const file = await this.call<{ file_path?: string }>('getFile', { file_id: audio.file_id });
+      if (!file.file_path) throw new Error('Telegram did not return the file.');
+      const bytes = await this.download(file.file_path);
+      const ext = (/\.(\w+)$/.exec(file.file_path)?.[1] ?? 'ogg').toLowerCase();
+      heard = await transcribe({ bytes, mime: audio.mime_type || 'audio/ogg', ext });
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      await this.send(chatId, `I couldn't transcribe that voice note (${backend.label}): ${why}`);
+      return;
+    }
+    if (!heard) {
+      await this.send(chatId, 'I couldn’t make out any words in that voice note.');
+      return;
+    }
+
+    // Show what was heard before acting on it, so a mis-hearing is caught by the person who spoke.
+    const shown = heard.length > 900 ? `${heard.slice(0, 900)}…` : heard;
+    await this.call('sendMessage', { chat_id: chatId, text: `<i>Heard:</i> ${esc(shown)}`, parse_mode: 'HTML' }).catch(() => {});
+
+    this.lastInbound = Date.now();
+    this.deps?.chat(caption ? `${heard}\n\n(Caption typed with the recording: ${caption})` : heard, true);
+    this.showTyping(chatId);
+  }
+
+  private async download(filePath: string): Promise<Buffer> {
+    const token = getTelegramToken();
+    let res: Response;
+    try {
+      res = await fetch(`${API()}/file/bot${token}/${filePath}`, { signal: AbortSignal.timeout(60_000) });
+    } catch {
+      // As in call(): the URL carries the token, so it must not surface in an error.
+      throw new Error('could not download the recording from Telegram');
+    }
+    if (!res.ok) throw new Error(`could not download the recording from Telegram (HTTP ${res.status})`);
+    return Buffer.from(await res.arrayBuffer());
   }
 
   private async handleButton(q: any): Promise<void> {

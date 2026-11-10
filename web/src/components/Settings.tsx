@@ -1,6 +1,6 @@
 import { Check, Copy, Loader2, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT } from '../../../shared/types.ts';
+import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { useStore } from '../store.ts';
 import { attempt, Avatar, toast } from './ui.tsx';
@@ -209,6 +209,97 @@ function CopyLine({ text, href }: { text: string; href?: string }) {
   );
 }
 
+const VOICE_CHOICES: [VoiceProvider, string][] = [
+  ['auto', 'Automatic'],
+  ['openai', 'OpenAI'],
+  ['gemini', 'Gemini'],
+  ['command', 'A command on this computer'],
+  ['off', 'Off'],
+];
+
+function VoiceNotes({ voice }: { voice: VoiceStatus }) {
+  const [draft, setDraft] = useState({ provider: voice.provider, model: voice.model, command: voice.command });
+  useEffect(() => setDraft({ provider: voice.provider, model: voice.model, command: voice.command }), [voice.provider, voice.model, voice.command]);
+  const dirty = draft.provider !== voice.provider || draft.model !== voice.model || draft.command !== voice.command;
+  const save = (next = draft) => void attempt(() => api.saveTelegram({ voice: next }));
+  const cloud = draft.provider === 'openai' || draft.provider === 'gemini';
+
+  return (
+    <div className="field">
+      <label htmlFor="voice-provider">Voice notes</label>
+      <span className="hint">
+        Send a voice note and it is transcribed, shown back to you as “Heard: …”, then handled like a typed message. Claude cannot transcribe
+        audio, so this needs an OpenAI or Gemini key, or a transcriber of your own.
+      </span>
+      <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <select
+          id="voice-provider"
+          className="select"
+          style={{ width: 230 }}
+          value={draft.provider}
+          onChange={(e) => {
+            // Switching service takes effect at once; a model id belongs to one provider, so it is cleared.
+            const next = { ...draft, provider: e.target.value as VoiceProvider, model: '' };
+            setDraft(next);
+            save(next);
+          }}
+        >
+          {VOICE_CHOICES.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {cloud && (
+          <input
+            className="input mono grow"
+            style={{ minWidth: 200 }}
+            value={draft.model}
+            placeholder="Model — leave empty for the default"
+            aria-label="Transcription model"
+            spellCheck={false}
+            onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && dirty && save()}
+          />
+        )}
+        {(draft.provider === 'command' || (draft.provider === 'auto' && draft.command)) && (
+          <input
+            className="input mono grow"
+            style={{ minWidth: 260 }}
+            value={draft.command}
+            placeholder="my-transcriber {file}"
+            aria-label="Transcription command"
+            spellCheck={false}
+            onChange={(e) => setDraft({ ...draft, command: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && dirty && save()}
+          />
+        )}
+        {dirty && (
+          <button className="btn primary" onClick={() => save()}>
+            Save
+          </button>
+        )}
+      </div>
+      {draft.provider === 'command' && (
+        <span className="hint">
+          Any command that prints the spoken words. <span className="mono">{'{file}'}</span> is replaced with the path of the recording (Ogg/Opus);
+          nothing leaves this computer.
+        </span>
+      )}
+      {voice.using ? (
+        <span className="hint">
+          Transcribed by <b>{voice.using}</b>
+          {voice.using.startsWith('A command') ? '.' : ' — the recording is sent to that provider and billed to your key.'}
+        </span>
+      ) : (
+        <span className="hint" style={{ color: voice.provider === 'off' ? undefined : 'var(--attn)' }}>
+          {voice.problem}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Phone() {
   const tg = useStore((s) => s.app!.telegram);
   const [token, setToken] = useState('');
@@ -324,6 +415,7 @@ function Phone() {
               </div>
             </span>
           </label>
+          <VoiceNotes voice={tg.voice} />
         </>
       )}
 

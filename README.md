@@ -78,8 +78,26 @@ phone shows up in the dashboard, marked *sent from Telegram*.
 
 The bot polls Telegram from your computer, so it needs no public address and answers only while Majordomo is
 running. Only chats linked with the one-time pairing code can use it; anyone else who finds the bot gets a refusal
-and never reaches the manager. Text messages only for now — no voice notes, photos or files. Messages pass through
-Telegram's servers, as with any bot.
+and never reaches the manager. Text and voice notes work; photos, videos and files do not yet. Messages pass
+through Telegram's servers, as with any bot.
+
+### Voice notes
+
+Send the bot a voice note and it is transcribed, shown back to you as *Heard: …* so you can catch a mis-hearing,
+then handled like a typed message. The manager is told it is reading a transcription and to double-check details
+that look doubtful.
+
+Claude has no speech-to-text, so transcription needs one of these (Settings → Phone → Voice notes):
+
+| Option | What it needs | Where the recording goes |
+| --- | --- | --- |
+| **OpenAI** | An OpenAI API key | OpenAI's transcription API, billed to your key |
+| **Gemini** | A Gemini API key | Gemini, billed to your key (re-encoded to MP3 first when `ffmpeg` is installed) |
+| **A command on this computer** | Any program that prints the spoken words | Nowhere — it stays on your machine |
+
+*Automatic* uses the first of those that is available. For a local command, write `{file}` where the path of the
+recording (Ogg/Opus) should go, for example `my-transcriber {file}`; only what the command prints to standard
+output is used. Telegram lets bots fetch recordings up to 20 MB.
 
 ## How it works
 
@@ -156,7 +174,8 @@ server/
   agents/prompts.ts   the manager's and workers' instructions
   llm/                provider adapters: anthropic.ts, openai.ts (OpenAI, Gemini, Muse, OpenRouter), demo.ts
   tools/              pm.ts (manager tools), worker.ts (worker tools)
-  gateways/telegram.ts  the Telegram bot: polling, pairing, replies, approval buttons
+  gateways/telegram.ts  the Telegram bot: polling, pairing, replies, approval buttons, voice notes
+  gateways/transcribe.ts  speech-to-text for voice notes: OpenAI, Gemini, or a local command
   mcp.ts              serves the manager's tools to a CLI-hosted manager over MCP
   http.ts             REST + server-sent events + the built dashboard
 web/src/              React dashboard
@@ -179,7 +198,8 @@ What has been exercised, and how:
 | OpenAI-compatible adapter (OpenAI, Gemini, Muse, OpenRouter) | Tests against a mock Chat Completions server — not yet against the live APIs |
 | Codex CLI and Gemini CLI drivers | Written against each CLI's documented flags and event format — not yet run signed-in |
 | Telegram gateway | Tests and a browser run against a mock of the Bot API — not yet against Telegram itself |
+| Voice notes | Tests against mocks of Telegram, OpenAI and Gemini, with real Ogg/Opus audio through `ffmpeg` and a real local command — not yet against the live services |
 
 Known limits: nothing survives a restart mid-run (running agents are marked *interrupted* and can be retried);
 switching the manager between a CLI and an API account starts a new conversation; Telegram is the only messaging
-gateway, and it is text-only.
+gateway, and it takes text and voice notes only; the manager always replies in text.

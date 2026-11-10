@@ -166,6 +166,24 @@ export interface TelegramChat {
   pairedAt: number;
 }
 
+export type VoiceProvider = 'auto' | 'openai' | 'gemini' | 'command' | 'off';
+
+export interface VoiceSettings {
+  /** What turns a voice note into text. auto picks the first that is available. */
+  provider: VoiceProvider;
+  /** Model id for OpenAI or Gemini; empty means the default for that provider. */
+  model: string;
+  /** Local transcription command; `{file}` is replaced by the audio file's path. */
+  command: string;
+}
+
+export interface VoiceStatus extends VoiceSettings {
+  /** The service that will transcribe right now, or '' when none can. */
+  using: string;
+  /** What is missing, when nothing can transcribe. */
+  problem: string;
+}
+
 export interface TelegramStatus {
   /** A bot token is saved (or set in the environment). */
   configured: boolean;
@@ -178,6 +196,7 @@ export interface TelegramStatus {
   chats: TelegramChat[];
   /** Also push the manager's own updates (work finished, approvals needed), not just replies. */
   notify: boolean;
+  voice: VoiceStatus;
 }
 
 export interface AppState {

@@ -74,11 +74,17 @@ function nowLine(): string {
   return `${d.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} (${zone})`;
 }
 
-function contextBlock(full: boolean, via?: InboxItem['via']): string {
+function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): string {
   const s = getSettings();
   const lines = [`Now: ${nowLine()}`];
   if (via === 'telegram') {
     lines.push('Channel: this message came from the user’s phone, over Telegram. Reply briefly and in plain sentences; they are reading on a small screen.');
+  }
+  if (voice) {
+    lines.push(
+      'Voice: the message is a machine transcription of a voice note. Names, numbers and unusual words may have been misheard; ' +
+        'read it for what was most likely said, and confirm with the user before acting on a detail that matters and looks doubtful.',
+    );
   }
   if (full) {
     if (s.userName) lines.push(`User: ${s.userName}`);
@@ -432,7 +438,7 @@ export const runner = new Runner({ spec: specFor, host, onStart, onFinish, onUsa
 // ---------- the orchestrator API (used by PM tools and the HTTP layer) ----------
 
 export const orch: Orch & {
-  chat(text: string, via?: InboxItem['via']): void;
+  chat(text: string, via?: InboxItem['via'], voice?: boolean): void;
   /** The user stopped a task from the dashboard; the PM should know its plan changed. */
   userCancelled(id: string): void;
   stopPm(): void;
@@ -588,8 +594,8 @@ export const orch: Orch & {
     sync({ reminders: reminders.all() });
   },
 
-  chat(text, via) {
-    runner.send(PM, { from: 'user', text: `${contextBlock(true, via)}\n\n${text}`, display: text, via });
+  chat(text, via, voice) {
+    runner.send(PM, { from: 'user', text: `${contextBlock(true, via, voice)}\n\n${text}`, display: text, via, voice });
     sync({ pm: pmStatus() });
   },
 
@@ -658,7 +664,7 @@ export const orch: Orch & {
     }
     approvals.expireAll();
     telegram.configure({
-      chat: (text) => orch.chat(text, 'telegram'),
+      chat: (text, voice) => orch.chat(text, 'telegram', voice),
       stopPm: () => orch.stopPm(),
       isPmBusy: () => runner.isBusy(PM) || runner.queued(PM) > 0,
       statusText,
