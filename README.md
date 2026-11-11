@@ -48,6 +48,21 @@ There are two ways an account can be used, and they are billed differently.
 | **Meta Muse** | — (Meta offers Muse to developers by API key only) | `MODEL_API_KEY` |
 | **OpenRouter** | — (prepaid credits) | `OPENROUTER_API_KEY` |
 
+To install Claude Code on a Mac or Linux and sign in:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+```bash
+~/.local/bin/claude
+```
+
+Choose your Claude account when it asks how to sign in, then restart Majordomo. Majordomo checks that what it
+found really is Claude Code, and looks in the installer's own folder as well as your `PATH`. That matters if some
+other program on your computer also answers to `claude` (Hermes Agent does): Majordomo will say so on the Accounts
+page instead of trying to use it, and will still find the real one at `~/.local/bin/claude`.
+
 **Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; Majordomo starts it
 headless with a task and turns its event stream into dashboard activity. Majordomo never sees or stores your
 subscription credentials. Usage counts against your plan's limits, and each vendor's terms decide what automated use

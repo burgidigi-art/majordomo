@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { CrewProfile, RuntimeId, RuntimeInfo, Settings } from '../shared/types.ts';
 import { DATA_DIR, kvGet, kvSet } from './db.ts';
@@ -90,29 +91,82 @@ function mask(key: string): string {
 
 // ---------- CLI detection (subscription logins) ----------
 
-export const CLI_BIN: Record<'claude-code' | 'codex' | 'gemini-cli', string> = {
-  'claude-code': process.env.MAJORDOMO_CLAUDE_BIN || 'claude',
-  codex: process.env.MAJORDOMO_CODEX_BIN || 'codex',
-  'gemini-cli': process.env.MAJORDOMO_GEMINI_BIN || 'gemini',
+type CliId = 'claude-code' | 'codex' | 'gemini-cli';
+
+interface CliSpec {
+  /** The command's usual name. */
+  command: string;
+  /** Environment variable that names the binary outright. */
+  override: string;
+  product: string;
+  /** What the real thing prints for --version. A program that merely shares the name will not match. */
+  identity: RegExp;
+}
+
+const CLI: Record<CliId, CliSpec> = {
+  'claude-code': { command: 'claude', override: 'MAJORDOMO_CLAUDE_BIN', product: 'Claude Code', identity: /claude code/i },
+  codex: { command: 'codex', override: 'MAJORDOMO_CODEX_BIN', product: 'the Codex CLI', identity: /codex/i },
+  // Gemini CLI prints only a version number.
+  'gemini-cli': { command: 'gemini', override: 'MAJORDOMO_GEMINI_BIN', product: 'the Gemini CLI', identity: /^v?\d+\.\d+/ },
 };
 
-const cliCache = new Map<string, { at: number; version: string | null }>();
+/**
+ * Where to look for a CLI: the name as the shell would resolve it, then the places its installers
+ * put it. The extra places matter when another program has claimed the same command name.
+ */
+function candidates(id: CliId): string[] {
+  const spec = CLI[id];
+  const named = process.env[spec.override];
+  if (named) return [named];
+  const home = os.homedir();
+  const extra =
+    id === 'claude-code'
+      ? [path.join(home, '.local', 'bin', 'claude'), path.join(home, '.claude', 'local', 'claude')]
+      : [path.join(home, '.local', 'bin', spec.command)];
+  return [spec.command, ...extra, path.join('/opt/homebrew/bin', spec.command), path.join('/usr/local/bin', spec.command)];
+}
 
-function probeCli(bin: string): Promise<string | null> {
+function versionOf(bin: string): Promise<string | null> {
   return new Promise((resolve) => {
     execFile(bin, ['--version'], { timeout: 8000 }, (err, stdout) => {
       if (err) return resolve(null);
-      resolve(String(stdout).trim().split('\n')[0] || 'installed');
+      resolve(String(stdout).trim().split('\n')[0] || '');
     });
   });
 }
 
-async function cliVersion(id: keyof typeof CLI_BIN): Promise<string | null> {
+interface CliFound {
+  /** The binary to run, when the real CLI was found. */
+  bin: string | null;
+  version: string;
+  /** What answered to the command name instead, when it was some other program. */
+  impostor: string;
+}
+
+const cliCache = new Map<CliId, { at: number; found: CliFound }>();
+
+async function findCli(id: CliId): Promise<CliFound> {
   const hit = cliCache.get(id);
-  if (hit && Date.now() - hit.at < 60_000) return hit.version;
-  const version = await probeCli(CLI_BIN[id]);
-  cliCache.set(id, { at: Date.now(), version });
-  return version;
+  if (hit && Date.now() - hit.at < 60_000) return hit.found;
+  const spec = CLI[id];
+  const found: CliFound = { bin: null, version: '', impostor: '' };
+  for (const bin of candidates(id)) {
+    const version = await versionOf(bin);
+    if (version === null) continue;
+    if (spec.identity.test(version)) {
+      found.bin = bin;
+      found.version = version;
+      break;
+    }
+    if (!found.impostor) found.impostor = version || 'something that prints no version';
+  }
+  cliCache.set(id, { at: Date.now(), found });
+  return found;
+}
+
+/** The binary to launch for a CLI runtime: the verified one if detection has run, else its plain name. */
+export function cliBinary(id: CliId): string {
+  return cliCache.get(id)?.found.bin ?? process.env[CLI[id].override] ?? CLI[id].command;
 }
 
 export function forgetCliProbe(): void {
@@ -141,7 +195,7 @@ export const RUNTIMES: RuntimeDef[] = [
     label: 'Claude · subscription',
     auth: 'Your Claude plan, through the Claude Code CLI',
     canManage: true,
-    setupHint: 'Install Claude Code, then run `claude` once in a terminal and sign in with your Claude account.',
+    setupHint: 'Install Claude Code (see the README), sign in once in a terminal with your Claude account, then restart Majordomo.',
     defaultModel: '',
   },
   {
@@ -249,11 +303,17 @@ export async function runtimeStatus(): Promise<RuntimeInfo[]> {
       };
       if (def.id === 'demo') return { ...base, ready: true, detail: 'Built in', keySource: null };
       if (def.kind === 'cli') {
-        const version = await cliVersion(def.id as keyof typeof CLI_BIN);
+        const id = def.id as CliId;
+        const found = await findCli(id);
+        const where = found.bin && found.bin !== CLI[id].command ? ` at ${found.bin.replace(os.homedir(), '~')}` : '';
         return {
           ...base,
-          ready: !!version,
-          detail: version ? `Found ${version}` : 'CLI not found on PATH',
+          ready: !!found.bin,
+          detail: found.bin
+            ? `Found ${found.version}${where}`
+            : found.impostor
+              ? `The \`${CLI[id].command}\` command on this computer is a different program (${found.impostor}), not ${CLI[id].product}.`
+              : 'Not installed, or not where Majordomo looks for it',
           keySource: null,
         };
       }

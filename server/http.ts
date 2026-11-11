@@ -289,6 +289,8 @@ app.post('/api/runtimes/:id/test', async (c) => {
       return c.json({ ok: true, message: `Connected — ${models.length} models available.` });
     }
     forgetCliProbe();
+    const status = (await runtimeStatus()).find((r) => r.id === id);
+    if (!status?.ready) return c.json({ ok: false, message: `${status?.detail ?? 'Not found.'} ${def.setupHint}` });
     const agentId = `probe:${Date.now()}`;
     try {
       const res = await runCliTurn({

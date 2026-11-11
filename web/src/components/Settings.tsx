@@ -131,6 +131,8 @@ function AccountCard({ rt, isPm }: { rt: RuntimeInfo; isPm: boolean }) {
         </span>
       </div>
 
+      {/* For a CLI that is missing, say what was found (it may be another program using the name), then how to fix it. */}
+      {!rt.ready && rt.kind === 'cli' && <div className="detail" style={{ color: 'var(--attn)' }}>{rt.detail}</div>}
       <div className="detail">{rt.ready ? rt.detail : rt.setupHint}</div>
       {rt.experimental && <div className="hint">{rt.experimental}</div>}
 

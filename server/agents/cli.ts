@@ -7,7 +7,7 @@ import type { Effort, RuntimeId } from '../../shared/types.ts';
 import { emit, emitDelta } from '../bus.ts';
 import { recordClaudeLimits } from '../limits.ts';
 import { EMPTY_USAGE, type Usage } from '../llm/types.ts';
-import { CLI_BIN, getSettings } from '../settings.ts';
+import { cliBinary, getSettings } from '../settings.ts';
 
 /**
  * Drivers for the vendors' own agent CLIs in headless mode. This is how subscription logins
@@ -339,7 +339,7 @@ const DRIVERS: Partial<Record<RuntimeId, Driver>> = { 'claude-code': claude, cod
 export function runCliTurn(turn: CliTurn): Promise<CliResult> {
   const driver = DRIVERS[turn.runtime];
   if (!driver) throw new Error(`No CLI driver for ${turn.runtime}`);
-  const bin = CLI_BIN[turn.runtime as keyof typeof CLI_BIN];
+  const bin = cliBinary(turn.runtime as 'claude-code' | 'codex' | 'gemini-cli');
   const built = driver.args(turn);
   fs.mkdirSync(turn.cwd, { recursive: true });
 
