@@ -121,9 +121,36 @@ function candidates(id: CliId): string[] {
   const home = os.homedir();
   const extra =
     id === 'claude-code'
-      ? [path.join(home, '.local', 'bin', 'claude'), path.join(home, '.claude', 'local', 'claude')]
+      ? [path.join(home, '.local', 'bin', 'claude'), ...claudeCodeVersions(home), path.join(home, '.claude', 'local', 'claude')]
       : [path.join(home, '.local', 'bin', spec.command)];
   return [spec.command, ...extra, path.join('/opt/homebrew/bin', spec.command), path.join('/usr/local/bin', spec.command)];
+}
+
+/**
+ * Claude Code's installer keeps each version of the real program in its own folder and points a
+ * `claude` launcher at the newest. If something else already owns that launcher's name (a Hermes
+ * profile called "claude" does), the launcher is never made — but the program is still here.
+ * Returns the installed versions, newest first.
+ */
+function claudeCodeVersions(home: string): string[] {
+  const dir = path.join(home, '.local', 'share', 'claude', 'versions');
+  try {
+    return fs
+      .readdirSync(dir)
+      .map((name) => {
+        const entry = path.join(dir, name);
+        const stat = fs.statSync(entry);
+        // A version is normally the program itself; allow for a folder holding it too.
+        const bin = stat.isDirectory() ? path.join(entry, 'claude') : entry;
+        return fs.existsSync(bin) ? { bin, at: stat.mtimeMs } : null;
+      })
+      .filter((v): v is { bin: string; at: number } => v !== null)
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 3)
+      .map((v) => v.bin);
+  } catch {
+    return [];
+  }
 }
 
 function versionOf(bin: string): Promise<string | null> {

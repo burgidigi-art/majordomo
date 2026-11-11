@@ -58,10 +58,20 @@ curl -fsSL https://claude.ai/install.sh | bash
 ~/.local/bin/claude
 ```
 
-Choose your Claude account when it asks how to sign in, then restart Majordomo. Majordomo checks that what it
-found really is Claude Code, and looks in the installer's own folder as well as your `PATH`. That matters if some
-other program on your computer also answers to `claude` (Hermes Agent does): Majordomo will say so on the Accounts
-page instead of trying to use it, and will still find the real one at `~/.local/bin/claude`.
+Choose your Claude account when it asks how to sign in, then restart Majordomo.
+
+**If another program already answers to `claude`** (a Hermes Agent profile named "claude" does, and its shortcut
+lives at that same `~/.local/bin/claude`), the installer cannot create its launcher and the command above opens
+the other program instead. Claude Code is still installed, in `~/.local/share/claude/versions/`. Sign in by
+running it from there:
+
+```bash
+"$(ls -t ~/.local/share/claude/versions/* | head -1)"
+```
+
+Majordomo handles this by itself: it checks that what it finds really is Claude Code, looks in that versions
+folder as well as your `PATH`, and says so on the Accounts page if all it can find is the other program. Your
+other program's shortcut is left alone.
 
 **Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; Majordomo starts it
 headless with a task and turns its event stream into dashboard activity. Majordomo never sees or stores your

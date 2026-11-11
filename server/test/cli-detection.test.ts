@@ -53,6 +53,29 @@ test('the real Claude Code is found where its installer puts it, even with the n
   assert.equal(settings.cliBinary('claude-code'), real, 'agents are launched with the verified program, not whatever the name resolves to');
 });
 
+test('with the launcher name taken by another program, the installed versions are found directly', async () => {
+  // Exactly the Hermes case: ~/.local/bin/claude is Hermes's own shortcut, so Claude Code's
+  // installer could not put its launcher there. The program itself sits in the versions folder.
+  const launcher = path.join(home, '.local', 'bin', 'claude');
+  program(launcher, 'Hermes Agent v0.22.5+2469.g74195d3 (2026.9.24) · stable');
+  const versions = path.join(home, '.local', 'share', 'claude', 'versions');
+  program(path.join(versions, '2.1.300'), '2.1.300 (Claude Code)');
+  program(path.join(versions, '2.1.322'), '2.1.322 (Claude Code)');
+  const old = Date.now() / 1000 - 86_400;
+  fs.utimesSync(path.join(versions, '2.1.300'), old, old);
+  settings.forgetCliProbe();
+
+  const status = await claude();
+  assert.equal(status.ready, true);
+  assert.equal(status.detail, 'Found 2.1.322 (Claude Code) at ~/.local/share/claude/versions/2.1.322');
+  assert.equal(settings.cliBinary('claude-code'), path.join(versions, '2.1.322'), 'the newest installed version is the one used');
+  assert.match(fs.readFileSync(launcher, 'utf8'), /Hermes Agent/, 'the other program’s shortcut is left exactly as it was');
+
+  fs.rmSync(path.join(home, '.local', 'share'), { recursive: true });
+  program(launcher, '2.1.322 (Claude Code)');
+  settings.forgetCliProbe();
+});
+
 test('a path given explicitly wins, and is still checked', async () => {
   const custom = path.join(home, 'tools', 'claude-custom');
   program(custom, '2.0.0 (Claude Code)');
