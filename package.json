@@ -12,6 +12,8 @@
     "build": "vite build",
     "start": "node bin/majordomo.mjs",
     "demo": "MAJORDOMO_DEMO=1 node bin/majordomo.mjs",
+    "install-app": "node bin/install-app.mjs",
+    "uninstall-app": "node bin/install-app.mjs --remove",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
     "test": "tsx --test server/test/*.test.ts"
   },

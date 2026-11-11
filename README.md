@@ -36,6 +36,36 @@ To run the demo crew on purpose, even with keys in your environment:
 npm run demo
 ```
 
+## Mac app
+
+On a Mac you can run Majordomo as an app instead of from a Terminal window:
+
+```bash
+npm run install-app
+```
+
+This adds **Majordomo** to your Applications folder and sets up a background service that starts when you log in.
+Clicking the app opens the dashboard in a window of its own (in Chrome, Edge, Brave, Chromium or Vivaldi if one is
+installed; otherwise in your default browser). Because the service is always running while you are logged in, the
+Telegram bot and reminders work without you starting anything.
+
+- The app holds no copy of the program. It runs this folder, so **keep the folder where it is**. If you move it, run
+  `npm run install-app` again.
+- After updating (`git pull`, then `npm install` if dependencies changed), run `npm run install-app` again. It restarts
+  the service on the new version.
+- macOS may tell you a background item was added, and if this folder is inside Documents, Desktop or Downloads it asks
+  once whether “node” may access that folder. Allow it.
+- API keys exported in your shell are not visible to the service. Paste them in **Settings → Accounts** instead.
+- The service writes its output to `~/.majordomo/logs/server.log`.
+- While the service is running, `npm start` reports that Majordomo is already running rather than starting a second
+  copy.
+
+To remove the app and stop the service (your projects, settings and keys are kept):
+
+```bash
+npm run uninstall-app
+```
+
 ## Connecting your accounts
 
 There are two ways an account can be used, and they are billed differently.

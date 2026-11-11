@@ -69,6 +69,9 @@ app.onError((err, c) => c.json({ error: describeError(err) }, 400));
 
 // ---------- state + live stream ----------
 
+// A cheap check that this is Majordomo and that it is answering; the Mac app polls it while starting up.
+app.get('/api/health', (c) => c.json({ ok: true, app: 'majordomo' }));
+
 app.get('/api/state', async (c) => c.json(await orch.state()));
 
 app.get('/api/stream', (c) =>
