@@ -24,6 +24,7 @@ import { Desk } from './components/Desk.tsx';
 import { Memory } from './components/Memory.tsx';
 import { ProjectDetail, Projects } from './components/Projects.tsx';
 import { Settings } from './components/Settings.tsx';
+import { TeamList } from './components/TeamList.tsx';
 import { attempt, Toaster } from './components/ui.tsx';
 import { accountName, isLive, useHashRoute } from './lib.ts';
 import { connect, useStore } from './store.ts';
@@ -137,6 +138,9 @@ export function App() {
             )}
           </span>
         </a>
+
+        <div className="side-label">Team</div>
+        <TeamList />
 
         <div className="side-label">Tools</div>
         <div className="nav">

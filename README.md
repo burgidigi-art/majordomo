@@ -257,6 +257,8 @@ files you send in, and one workspace folder per project. A project can instead p
   - *Work flow.* A stream runs from your work to each connected account and each crew member. It glitters and
     moves while an agent is actually working there, and fades to a trickle when idle. The two controls beside it
     are real settings: whether shell commands run freely or ask first, and how many agents work at once.
+- **Team** — in the sidebar on every page: each crew member, whether it is working, waiting for an answer, up next or
+  idle, and the task it is on, live. Click one to open that agent's transcript as it streams.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type
