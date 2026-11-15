@@ -5,7 +5,7 @@ import { ago, compact, duration, isLive, isTrouble, money, taskElapsed, useNow }
 import { useStore } from '../store.ts';
 import { attempt, Empty, TaskAvatar } from './ui.tsx';
 
-function ApprovalCard({ approval }: { approval: Approval }) {
+export function ApprovalCard({ approval }: { approval: Approval }) {
   const task = useStore((s) => s.app?.tasks.find((t) => t.id === approval.agentId));
   return (
     <div className="approval">

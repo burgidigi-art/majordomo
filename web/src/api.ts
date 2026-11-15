@@ -1,4 +1,4 @@
-import type { AgentEvent, AppState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { AgentEvent, AlertSettings, AppState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -47,6 +47,8 @@ export const api = {
   test: (runtime: RuntimeId) => post<{ ok: boolean; message: string }>(`/api/runtimes/${runtime}/test`),
   adopt: (runtime: RuntimeId, model: string) => post('/api/setup/adopt', { runtime, model }),
 
+  saveAlerts: (body: { mac?: boolean; phoneFailures?: boolean }) =>
+    request<AlertSettings>('/api/alerts', { method: 'PUT', body: JSON.stringify(body) }),
   saveTelegram: (body: { token?: string; notify?: boolean; voice?: Partial<VoiceSettings> }) =>
     request<TelegramStatus>('/api/telegram', { method: 'PUT', body: JSON.stringify(body) }),
   removeTelegram: () => request<TelegramStatus>('/api/telegram', { method: 'DELETE' }),

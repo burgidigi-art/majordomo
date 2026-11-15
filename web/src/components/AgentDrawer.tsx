@@ -5,6 +5,7 @@ import { api } from '../api.ts';
 import { compact, duration, isLive, money, taskElapsed, useNow } from '../lib.ts';
 import { useStore, type StreamingBlock } from '../store.ts';
 import { useStickToBottom } from './Desk.tsx';
+import { ApprovalCard } from './CrewRail.tsx';
 import { Transcript } from './Transcript.tsx';
 import { attempt, StatusPill, TaskAvatar } from './ui.tsx';
 
@@ -21,6 +22,8 @@ export function AgentDrawer() {
   const allTasks = useStore((s) => s.app?.tasks);
   const helpers = useMemo(() => (allTasks ?? []).filter((t) => t.parentId === id), [allTasks, id]);
   const runtime = useStore((s) => s.app?.runtimes.find((r) => r.id === task?.runtime));
+  const allApprovals = useStore((s) => s.app?.approvals);
+  const pending = useMemo(() => (allApprovals ?? []).filter((a) => a.agentId === id), [allApprovals, id]);
   const events = useStore((s) => (id ? s.events[id] : undefined) ?? NO_EVENTS);
   const streaming = useStore((s) => (id ? s.streaming[id] : undefined) ?? NO_STREAM);
 
@@ -78,7 +81,7 @@ export function AgentDrawer() {
                 )}
               </div>
             </div>
-            <StatusPill status={task.status} />
+            <StatusPill status={task.status} label={pending.length ? 'Needs your approval' : undefined} />
             {canCancel && (
               <button className="btn sm" onClick={() => void attempt(() => api.cancelTask(task.id))}>
                 <Square size={11} fill="currentColor" /> Stop
@@ -136,6 +139,9 @@ export function AgentDrawer() {
               ))}
             </div>
           )}
+          {pending.map((a) => (
+            <ApprovalCard key={a.id} approval={a} />
+          ))}
         </div>
 
         <div className="drawer-scroll" ref={scroller}>
@@ -170,11 +176,13 @@ export function AgentDrawer() {
               className="textarea"
               style={{ minHeight: 38, height: 38, resize: 'none' }}
               placeholder={
-                task.status === 'waiting'
-                  ? 'Answer this agent’s question directly…'
-                  : live
-                    ? 'Steer this agent — it reads your note at its next step…'
-                    : 'Ask this agent for a follow-up — it still has its context…'
+                pending.length
+                  ? 'Allow or decline above, or add a note for this agent…'
+                  : task.status === 'waiting'
+                    ? 'Answer this agent’s question directly…'
+                    : live
+                      ? 'Steer this agent — it reads your note at its next step…'
+                      : 'Ask this agent for a follow-up — it still has its context…'
               }
               value={draft}
               onChange={(e) => setDraft(e.target.value)}

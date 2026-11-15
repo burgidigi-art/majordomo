@@ -10,6 +10,7 @@ import { events, memory, projects, reminders, tasks } from './db.ts';
 import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient, startSignIn } from './google.ts';
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
+import { alerts } from './alerts.ts';
 import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
 import { orch, runner, tick } from './orchestrator.ts';
@@ -344,6 +345,14 @@ app.post('/api/setup/adopt', async (c) => {
   }
   await pushSettings();
   return c.json({ ok: true });
+});
+
+// ---------- alerts ----------
+
+app.put('/api/alerts', async (c) => {
+  const body = await c.req.json<{ mac?: boolean; phoneFailures?: boolean }>();
+  alerts.set({ mac: body.mac, phoneFailures: body.phoneFailures });
+  return c.json(alerts.status());
 });
 
 // ---------- phone (Telegram) ----------

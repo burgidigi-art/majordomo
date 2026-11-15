@@ -229,6 +229,16 @@ export interface AccountLimits {
   at: number;
 }
 
+/** How the user is told when something needs them. */
+export interface AlertSettings {
+  /** Notifications are posted through macOS, so only offered there. */
+  macSupported: boolean;
+  /** A macOS notification with a sound for approvals waiting on the user and for failed tasks. */
+  mac: boolean;
+  /** A Telegram message when a task fails (approvals already arrive there with buttons). */
+  phoneFailures: boolean;
+}
+
 export interface AppState {
   settings: Settings;
   runtimes: RuntimeInfo[];
@@ -239,6 +249,7 @@ export interface AppState {
   reminders: Reminder[];
   pm: PmStatus;
   telegram: TelegramStatus;
+  alerts: AlertSettings;
   limits: Partial<Record<RuntimeId, AccountLimits>>;
   google: GoogleStatus;
   demo: boolean;

@@ -1,7 +1,8 @@
 import type { Task } from '../../shared/types.ts';
 import { ago, duration, isLive, isTrouble, taskElapsed } from './format.ts';
 
-export type TeamState = 'waiting' | 'working' | 'trouble' | 'queued' | 'idle';
+/** approval: a command waits for the user. asking: the bot asked the manager, which answers it. */
+export type TeamState = 'approval' | 'asking' | 'working' | 'trouble' | 'queued' | 'idle';
 
 export interface Member {
   id: string;
@@ -19,7 +20,8 @@ export interface Member {
 }
 
 export const TEAM_STATE_LABEL: Record<TeamState, string> = {
-  waiting: 'Needs an answer',
+  approval: 'Needs your approval',
+  asking: 'Asking manager',
   working: 'Working',
   trouble: 'Last task failed',
   queued: 'Up next',
@@ -30,7 +32,13 @@ export const TEAM_STATE_LABEL: Record<TeamState, string> = {
  * Where each crew member stands, worked out from the tasks it has been given. A member that was
  * removed from the crew still shows while it has live work, so nothing running drops out of view.
  */
-export function teamOf(crew: { id: string; name: string; runtime: string }[], tasks: Task[], now: number): Member[] {
+export function teamOf(
+  crew: { id: string; name: string; runtime: string }[],
+  tasks: Task[],
+  now: number,
+  approvals: { agentId: string }[] = [],
+): Member[] {
+  const awaitingUser = new Set(approvals.map((a) => a.agentId));
   const byCrew = new Map<string, Task[]>();
   for (const t of tasks) byCrew.set(t.crewId, [...(byCrew.get(t.crewId) ?? []), t]);
 
@@ -42,7 +50,8 @@ export function teamOf(crew: { id: string; name: string; runtime: string }[], ta
   return people.map((c) => {
     const mine = byCrew.get(c.id) ?? [];
     const live = mine.filter(isLive).sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
-    const waiting = live.filter((t) => t.status === 'waiting');
+    const approval = live.filter((t) => awaitingUser.has(t.id));
+    const asking = live.filter((t) => t.status === 'waiting' && !awaitingUser.has(t.id));
     const queued = mine.filter((t) => t.status === 'queued').sort((a, b) => a.createdAt - b.createdAt);
     const last = mine.filter((t) => t.finishedAt).sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))[0];
     const more = live.length > 1 ? ` · +${live.length - 1} more` : '';
@@ -51,9 +60,13 @@ export function teamOf(crew: { id: string; name: string; runtime: string }[], ta
     let line: string;
     let target: Task | null;
     let time = '';
-    if (waiting.length) {
-      state = 'waiting';
-      target = waiting[0]!;
+    if (approval.length) {
+      state = 'approval';
+      target = approval[0]!;
+      line = `${target.title}${more}`;
+    } else if (asking.length) {
+      state = 'asking';
+      target = asking[0]!;
       line = `${target.title}${more}`;
     } else if (live.length) {
       state = 'working';

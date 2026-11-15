@@ -302,6 +302,50 @@ function VoiceNotes({ voice }: { voice: VoiceStatus }) {
   );
 }
 
+/** How the user hears about something that needs them, on this Mac and on the phone. */
+function Alerts() {
+  const app = useStore((s) => s.app)!;
+  const a = app.alerts;
+  const tg = app.telegram;
+  return (
+    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>When something needs you</h3>
+      <div className="hint" style={{ marginTop: -8 }}>
+        That is a command waiting for your approval, or a task that failed. The team in the sidebar flashes for both. A bot asking your manager
+        a question does not count: the manager answers those itself.
+      </div>
+      {a.macSupported && (
+        <label className="switch">
+          <input type="checkbox" checked={a.mac} onChange={(e) => void attempt(() => api.saveAlerts({ mac: e.target.checked }))} />
+          <span>
+            Show a notification on this Mac
+            <div className="hint">
+              With a sound, even when the dashboard is closed. The first one may ask for permission; allow it, or turn notifications on for Script
+              Editor in System Settings → Notifications.
+            </div>
+          </span>
+        </label>
+      )}
+      <label className="switch">
+        <input
+          type="checkbox"
+          checked={a.phoneFailures}
+          disabled={!tg.chats.length}
+          onChange={(e) => void attempt(() => api.saveAlerts({ phoneFailures: e.target.checked }))}
+        />
+        <span>
+          Message my phone when a task fails
+          <div className="hint">
+            {tg.chats.length
+              ? 'Through Telegram. Approvals already arrive there with Allow and Decline buttons while “Send me updates on my phone” is on.'
+              : 'Link Telegram below first.'}
+          </div>
+        </span>
+      </label>
+    </div>
+  );
+}
+
 function Phone() {
   const tg = useStore((s) => s.app!.telegram);
   const [token, setToken] = useState('');
@@ -634,12 +678,13 @@ export function Settings({ section }: { section?: string }) {
         </section>
 
         <section className="section" id="phone">
-          <h2>Phone</h2>
+          <h2>Phone &amp; alerts</h2>
           <p>
             Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. Voice notes, photos and
             files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while Majordomo is running
             here.
           </p>
+          <Alerts />
           <Phone />
         </section>
 

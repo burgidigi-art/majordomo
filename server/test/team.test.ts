@@ -77,12 +77,22 @@ test('with several tasks at once, the longest-running is shown and the rest are 
   assert.equal(m.target?.id, older.id);
 });
 
-test('a member waiting for an answer comes before its other work', () => {
+test('a command waiting for the user to approve it comes before everything else', () => {
   const running = task('office', { title: 'Reconcile receipts', status: 'running', startedAt: NOW - 9 * MIN });
-  const waiting = task('office', { title: 'Which account is rent?', status: 'waiting', startedAt: NOW - 2 * MIN });
-  const m = member([running, waiting], 'office');
-  assert.equal(m.state, 'waiting');
-  assert.equal(m.target?.id, waiting.id);
+  const asking = task('office', { title: 'Which account is rent?', status: 'waiting', startedAt: NOW - 5 * MIN });
+  const approval = task('office', { title: 'Clean the export folder', status: 'waiting', startedAt: NOW - 2 * MIN });
+  const m = teamOf(crew, [running, asking, approval], NOW, [{ agentId: approval.id }]).find((x) => x.id === 'office')!;
+  assert.equal(m.state, 'approval');
+  assert.equal(m.target?.id, approval.id);
+  assert.equal(m.line, 'Clean the export folder · +2 more');
+});
+
+test('a bot asking the manager a question is shown as asking, not as needing the user', () => {
+  const running = task('office', { title: 'Reconcile receipts', status: 'running', startedAt: NOW - 9 * MIN });
+  const asking = task('office', { title: 'Which account is rent?', status: 'waiting', startedAt: NOW - 2 * MIN });
+  const m = member([running, asking], 'office');
+  assert.equal(m.state, 'asking');
+  assert.equal(m.target?.id, asking.id);
   assert.equal(m.line, 'Which account is rent? · +1 more');
 });
 

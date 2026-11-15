@@ -41,11 +41,11 @@ export function TaskAvatar({ task, small }: { task: Task; small?: boolean }) {
   return <Avatar name={task.crewName} family={familyOf(runtimes, task.runtime)} live={task.status === 'running'} small={small} />;
 }
 
-export function StatusPill({ status }: { status: TaskStatus }) {
+export function StatusPill({ status, label }: { status: TaskStatus; label?: string }) {
   return (
     <span className={`pill ${status}`}>
       <span className="dot" />
-      {STATUS_LABEL[status]}
+      {label ?? STATUS_LABEL[status]}
     </span>
   );
 }

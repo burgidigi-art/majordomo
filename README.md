@@ -257,8 +257,14 @@ files you send in, and one workspace folder per project. A project can instead p
   - *Work flow.* A stream runs from your work to each connected account and each crew member. It glitters and
     moves while an agent is actually working there, and fades to a trickle when idle. The two controls beside it
     are real settings: whether shell commands run freely or ask first, and how many agents work at once.
-- **Team** — in the sidebar on every page: each crew member, whether it is working, waiting for an answer, up next or
-  idle, and the task it is on, live. Click one to open that agent's transcript as it streams.
+- **Team** — in the sidebar on every page: each crew member, whether it is working, asking the manager, up next or
+  idle, and the task it is on, live. Click one to open that agent's transcript as it streams. A member **flashes** when
+  something needs you: violet for a command waiting for your approval (Allow / Decline are in the panel that opens),
+  red for a failed task until you open it. A bot asking the manager a question does not flash; the manager answers it.
+- **Alerts** — when something needs you, the background service posts a macOS notification with a sound (the dashboard
+  can be closed), and a failed task is also sent to your phone over Telegram; approvals already arrive there with
+  buttons. Both can be switched off under Settings → Phone & alerts. Bouncing the Dock icon needs a native app, so it
+  waits for the signed Mac app.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type

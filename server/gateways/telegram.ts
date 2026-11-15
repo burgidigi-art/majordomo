@@ -591,6 +591,11 @@ class TelegramGateway {
     if (origin.viaTelegram || (this.notify && !origin.fromDashboard)) void this.broadcast(clean);
   }
 
+  /** Something the user should know at once, sent to every linked chat. */
+  alert(text: string): void {
+    if (this.abort && this.chats.length) void this.broadcast(text);
+  }
+
   private async syncApprovals(pending: Approval[]): Promise<void> {
     if (!this.abort) return;
     for (const a of pending) {

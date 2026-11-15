@@ -7,6 +7,7 @@ import { fileSize } from './inbox.ts';
 import { googleConnected, googleStatus } from './google.ts';
 import { getLimits } from './limits.ts';
 import { googleTools } from './tools/google.ts';
+import { alerts } from './alerts.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -321,6 +322,7 @@ const host: Host = {
     approvals.insert({ id, agentId, tool, summary, detail, status: 'pending', createdAt: Date.now() });
     sync({ approvals: approvals.pending() });
     if (before) patchTask(agentId, { status: 'waiting', statusLine: 'Waiting for your approval' });
+    alerts.needsApproval(before, summary);
     return new Promise<boolean>((resolve) => {
       const settle = (ok: boolean) => {
         signal.removeEventListener('abort', onAbort);
@@ -394,6 +396,7 @@ function onFinish(id: string, outcome: Outcome): void {
     next = t.status === 'cancelled' ? t : patchTask(id, { status: 'interrupted', finishedAt: now, statusLine: 'Stopped' });
   } else {
     next = patchTask(id, { status: 'failed', error: outcome.error ?? 'Unknown error', finishedAt: now, statusLine: 'Failed' });
+    if (next) alerts.taskFailed(next);
   }
   if (!next) return;
 
@@ -692,6 +695,7 @@ export const orch: Orch & {
       reminders: reminders.all(),
       pm: pmStatus(),
       telegram: telegram.status(),
+      alerts: alerts.status(),
       limits: getLimits(),
       google: googleStatus(),
       demo: DEMO || getSettings().pm.runtime === 'demo',
