@@ -1,0 +1,36 @@
+{
+  "name": "grokbot-model-watch",
+  "version": "0.1.0",
+  "description": "Shows what can actually be known about which model is behind each of your Grok Bots, graded by evidence: Cursor's signed per-request identifier (Enterprise inference hooks), your Cursor usage ledger, and what the Bot says about itself. Gives Bots a which-model skill and tools so they answer honestly instead of guessing.",
+  "author": {
+    "name": "Majordomo contributors"
+  },
+  "homepage": "https://github.com/burgidigi-art/majordomo/tree/main/grokbot-model-watch",
+  "repository": "https://github.com/burgidigi-art/majordomo",
+  "license": "MIT",
+  "keywords": [
+    "grok bot model watch",
+    "model watch",
+    "which model",
+    "grokbot-model-watch"
+  ],
+  "logo": "assets/logo.svg",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "MODEL_WATCH_URL": {
+        "type": "string",
+        "title": "Model Watch public URL",
+        "description": "The base https:// URL where Cursor's servers can reach your companion, without a trailing slash or /mcp (for example https://watch.example.com). Bots run in the cloud, so localhost never works here; a tunnel (Cloudflare Tunnel, Tailscale Funnel, ngrok) or a small VPS is fine. Leave both variables empty to use only the dashboard and the which-model skill."
+      },
+      "MODEL_WATCH_TOKEN": {
+        "type": "string",
+        "title": "Model Watch bearer token",
+        "description": "The token printed by `grokbot-model-watch token`. Cursor stores it and sends it from its servers when a Bot calls the companion's tools; rotate it with `token --rotate` if the plugin is removed or a Bot is shared."
+      }
+    }
+  }
+}

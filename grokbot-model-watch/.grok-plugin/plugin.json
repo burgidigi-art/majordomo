@@ -1,0 +1,14 @@
+{
+  "name": "grokbot-model-watch",
+  "version": "0.1.0",
+  "description": "Shows what can actually be known about which model is behind each of your Grok Bots, graded by evidence: Cursor's signed per-request identifier (Enterprise inference hooks), your Cursor usage ledger, and what the Bot says about itself. Gives agents a which-model skill and tools so they answer honestly instead of guessing.",
+  "author": {
+    "name": "Majordomo contributors"
+  },
+  "homepage": "https://github.com/burgidigi-art/majordomo/tree/main/grokbot-model-watch",
+  "repository": "https://github.com/burgidigi-art/majordomo",
+  "license": "MIT",
+  "keywords": ["grok bot model watch", "model watch", "which model", "grokbot-model-watch"],
+  "skills": "./skills/",
+  "mcpServers": "./grok-mcp.json"
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Grok Bot Model Watch">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#14213d"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="#f4a261" stroke-width="4"/>
+  <circle cx="32" cy="32" r="6" fill="#f4a261"/>
+  <path d="M32 15v6M32 43v6M15 32h6M43 32h6" stroke="#e9ecef" stroke-width="3" stroke-linecap="round"/>
+  <path d="M8 50h48" stroke="#2a9d8f" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+</svg>

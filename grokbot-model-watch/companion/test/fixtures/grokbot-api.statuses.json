@@ -1,0 +1,85 @@
+{
+  "statuses": [
+    {
+      "agentId": "0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b",
+      "isRunning": true,
+      "live": {
+        "isRunning": true,
+        "isComposingMessage": true,
+        "isRetrying": false,
+        "activity": {
+          "kind": "tool",
+          "tool": "browser",
+          "detail": "Reading arxiv.org"
+        },
+        "hasRunningSubagents": true,
+        "workingTaskIds": [
+          "task-1",
+          7,
+          null,
+          "task-2"
+        ],
+        "lastTurnSettlement": {
+          "turnId": "turn-user-0",
+          "outcome": "GROK_BOT_TURN_OUTCOME_SUCCESS",
+          "settledAtMs": "1731599940000"
+        },
+        "updatedAtMs": "1731600001000",
+        "sessionId": "sess-1"
+      },
+      "client": {
+        "unreadCount": "3",
+        "lastActivityAtMs": "1731600000500",
+        "lastMessagePreview": "  Working on   it,\n this will take a moment and the preview goes on and on well past the eighty character limit so it must be cut.  ",
+        "lastEntryKind": "send-message"
+      }
+    },
+    {
+      "agentId": "1c2d3e4f-5061-4728-9bac-1d2e3f4a5b6c",
+      "isRunning": true,
+      "live": {
+        "isRunning": true,
+        "awaiting": {
+          "reason": "approval"
+        },
+        "activity": {
+          "kind": "tool",
+          "tool": "",
+          "detail": ""
+        }
+      },
+      "client": {}
+    },
+    {
+      "agentId": "inbox-bot",
+      "live": {
+        "awaiting": {}
+      }
+    },
+    {
+      "agentId": "idle-bot",
+      "live": {
+        "lastTurnSettlement": {
+          "turnId": "turn-9",
+          "outcome": "GROK_BOT_TURN_OUTCOME_SUCCESS",
+          "settledAtMs": "1731590000000"
+        }
+      },
+      "client": {
+        "lastActivityAtMs": "1731590000000",
+        "unreadCount": 0,
+        "lastMessagePreview": "Done, summary attached."
+      }
+    },
+    {
+      "agentId": "top-level-running",
+      "isRunning": true
+    },
+    {
+      "live": {
+        "isRunning": true
+      }
+    },
+    "not an object"
+  ]
+}

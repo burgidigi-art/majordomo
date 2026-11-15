@@ -1,0 +1,50 @@
+{
+  "agents": [
+    {
+      "id": "101",
+      "agentId": "0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b",
+      "name": "Research Bot",
+      "description": "Reads papers and news, writes briefs.",
+      "kind": "GROK_BOT_AGENT_KIND_AGENT",
+      "harness": "temporal",
+      "role": "GROK_BOT_AGENT_ROLE_OWNER",
+      "viewerIsOwner": true,
+      "ownerDisplayName": "You",
+      "updatedAtMs": "1731600000000"
+    },
+    {
+      "id": "102",
+      "agentId": "1c2d3e4f-5061-4728-9bac-1d2e3f4a5b6c",
+      "name": "Ops Bot",
+      "kind": "GROK_BOT_AGENT_KIND_AGENT",
+      "updatedAtMs": "1731599000"
+    },
+    {
+      "id": "103",
+      "agentId": "2d3e4f50-6172-4839-abcd-2e3f4a5b6c7d",
+      "title": "Team Room",
+      "kind": "GROK_BOT_AGENT_KIND_GROUP",
+      "memberAgentIds": [
+        "0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b",
+        "1c2d3e4f-5061-4728-9bac-1d2e3f4a5b6c"
+      ]
+    },
+    {
+      "id": "104",
+      "name": "Legacy row without agentId",
+      "kind": "GROK_BOT_AGENT_KIND_AGENT"
+    },
+    {
+      "agentId": "3e4f5061-7283-494a-bcde-3f4a5b6c7d8e",
+      "name": "Squad",
+      "memberAgentIds": [
+        "0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b"
+      ]
+    },
+    {
+      "name": "no ids at all"
+    },
+    "not an object",
+    null
+  ]
+}

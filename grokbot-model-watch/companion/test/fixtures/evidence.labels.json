@@ -1,0 +1,237 @@
+{
+  "comment": "Usage-ledger labels and the classification each must produce (spec 2.3 / lib/evidence.mjs). `display` is a regular expression when it starts with ^.",
+  "cases": [
+    {
+      "label": "grok-bot-default",
+      "kind": "grok-bot-mask",
+      "mode": "chat",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*chat turn \\(model hidden\\)$"
+    },
+    {
+      "label": "grok-bot-automation",
+      "kind": "grok-bot-mask",
+      "mode": "routine",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*routine run \\(model hidden\\)$"
+    },
+    {
+      "label": "grok-bot-cua",
+      "kind": "grok-bot-mask",
+      "mode": "computer-use",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*computer use \\(model hidden\\)$"
+    },
+    {
+      "label": "grok-bot-voice",
+      "kind": "grok-bot-mask",
+      "mode": "other",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*voice \\(model hidden\\)$"
+    },
+    {
+      "label": "sand-78zum5",
+      "kind": "opaque-alias",
+      "mode": "alias",
+      "family": null,
+      "opaque": true,
+      "display": "Cursor alias sand-78zum5 (model hidden)"
+    },
+    {
+      "label": "sand-default",
+      "kind": "opaque-alias",
+      "mode": "chat",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*chat turn \\(model hidden\\)$"
+    },
+    {
+      "label": "sand-automation",
+      "kind": "opaque-alias",
+      "mode": "routine",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*routine run \\(model hidden\\)$"
+    },
+    {
+      "label": "sand-cua",
+      "kind": "opaque-alias",
+      "mode": "computer-use",
+      "family": null,
+      "opaque": true,
+      "display": "^Grok Bot\\b.*computer use \\(model hidden\\)$"
+    },
+    {
+      "label": "claude-4-sonnet",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Anthropic Claude",
+      "opaque": false,
+      "display": "claude-4-sonnet"
+    },
+    {
+      "label": "opus-4.1",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Anthropic Claude",
+      "opaque": false,
+      "display": "opus-4.1"
+    },
+    {
+      "label": "claude-3-5-haiku",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Anthropic Claude",
+      "opaque": false,
+      "display": "claude-3-5-haiku"
+    },
+    {
+      "label": "grok-4",
+      "kind": "model-id",
+      "mode": null,
+      "family": "xAI Grok",
+      "opaque": false,
+      "display": "grok-4"
+    },
+    {
+      "label": "grok-code-fast-1",
+      "kind": "model-id",
+      "mode": null,
+      "family": "xAI Grok",
+      "opaque": false,
+      "display": "grok-code-fast-1"
+    },
+    {
+      "label": "cursor-grok-4.6-high-fast",
+      "kind": "model-id",
+      "mode": null,
+      "family": "xAI Grok",
+      "opaque": false,
+      "display": "cursor-grok-4.6-high-fast"
+    },
+    {
+      "label": "gpt-5",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "gpt-5"
+    },
+    {
+      "label": "gpt-4o-mini",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "gpt-4o-mini"
+    },
+    {
+      "label": "o3",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "o3"
+    },
+    {
+      "label": "o3-pro",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "o3-pro"
+    },
+    {
+      "label": "o4-mini",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "o4-mini"
+    },
+    {
+      "label": "codex-mini",
+      "kind": "model-id",
+      "mode": null,
+      "family": "OpenAI",
+      "opaque": false,
+      "display": "codex-mini"
+    },
+    {
+      "label": "gemini-2.5-pro",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Google Gemini",
+      "opaque": false,
+      "display": "gemini-2.5-pro"
+    },
+    {
+      "label": "composer-1",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Cursor",
+      "opaque": false,
+      "display": "composer-1"
+    },
+    {
+      "label": "cursor-small",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Cursor",
+      "opaque": false,
+      "display": "cursor-small"
+    },
+    {
+      "label": "deepseek-v3.1",
+      "kind": "model-id",
+      "mode": null,
+      "family": "DeepSeek",
+      "opaque": false,
+      "display": "deepseek-v3.1"
+    },
+    {
+      "label": "kimi-k2-instruct",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Kimi",
+      "opaque": false,
+      "display": "kimi-k2-instruct"
+    },
+    {
+      "label": "llama-3.3-70b",
+      "kind": "model-id",
+      "mode": null,
+      "family": "Meta",
+      "opaque": false,
+      "display": "llama-3.3-70b"
+    },
+    {
+      "label": "mystery-model-9000",
+      "kind": "unrecognized-label",
+      "mode": null,
+      "family": null,
+      "opaque": true,
+      "display": "^mystery-model-9000 \\(unrecognized label"
+    },
+    {
+      "label": "unknown",
+      "kind": "unknown",
+      "mode": null,
+      "family": null,
+      "opaque": true,
+      "display": "unknown label"
+    },
+    {
+      "label": "",
+      "kind": "unknown",
+      "mode": null,
+      "family": null,
+      "opaque": true,
+      "display": "unknown label"
+    }
+  ]
+}

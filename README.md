@@ -343,3 +343,12 @@ Known limits: nothing survives a restart mid-run (running agents are marked *int
 switching the manager between a CLI and an API account starts a new conversation; Telegram is the only messaging
 gateway; the manager replies in text and can send files, but not voice; files can only be attached from the
 phone, not from the dashboard.
+
+## Also in this repository: Grok Bot Model Watch
+
+[`grokbot-model-watch/`](grokbot-model-watch/) is a separate, dependency-free companion and
+plugin for xAI's Grok Bot. It shows, graded by evidence, what can be known about which model
+is behind each Bot (on most plans Cursor hides it, and the dashboard says so), gives Bots a
+`which-model` skill and MCP tools so they answer honestly, and receives Cursor Enterprise
+inference-hook frames, the one source of a per-request model identifier. See its
+[README](grokbot-model-watch/README.md).

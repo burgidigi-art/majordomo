@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "model-watch": {
+      "type": "http",
+      "url": "${MODEL_WATCH_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MODEL_WATCH_TOKEN}"
+      }
+    }
+  }
+}
