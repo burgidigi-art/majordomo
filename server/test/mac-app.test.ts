@@ -19,6 +19,7 @@ const mac = (await import(path.join(repo, 'bin/mac-app.mjs'))) as {
   launcherScript: (p: Plan) => string;
   stableNodePath: (execPath: string, pathVar: string) => string;
   guardedFolder: (root: string, home: string) => string | null;
+  cloudOnly: (log: string) => boolean;
   install: (p: Plan, sys: Sys) => Promise<{ app: string }>;
   uninstall: (p: Plan, sys: Sys) => Promise<void>;
 };
@@ -86,14 +87,14 @@ test('a checkout inside a folder macOS guards is recognised', () => {
 
 // ----- the launcher inside the app, run for real against stand-ins for the macOS commands -----
 
-function stubs(dir: string, healthyWhen: string) {
+function stubs(dir: string, healthyWhen: string, onKickstart = '') {
   const bin = path.join(dir, 'bin');
   const calls = path.join(dir, 'calls.log');
   fs.mkdirSync(bin);
   const write = (name: string, body: string) => fs.writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
   const record = (name: string) => `printf '%s' ${name} >> "${calls}"; for a in "$@"; do printf ' [%s]' "$a" >> "${calls}"; done; echo >> "${calls}"`;
   write('curl', `if ${healthyWhen}; then echo '{"ok":true,"app":"majordomo"}'; else exit 7; fi`);
-  write('launchctl', `${record('launchctl')}\nif [ "$1" = kickstart ]; then touch "${dir}/started"; fi`);
+  write('launchctl', `${record('launchctl')}\nif [ "$1" = kickstart ]; then touch "${dir}/started"; ${onKickstart} fi`);
   write('open', record('open'));
   write('osascript', record('osascript'));
   return { bin, read: () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '') };
@@ -151,6 +152,63 @@ test('if Majordomo cannot start, the app says why instead of opening a dead page
   assert.ok(calls.includes('EPERM: operation not permitted'), 'the log is quoted so it can be passed on');
 });
 
+// The crash from a checkout in iCloud-synced Documents, as Node prints it under launchd.
+const CLOUD_CRASH = `node:fs:978
+  return binding.read(fd, buffer, offset, length, position);
+                 ^
+
+Error: Unknown system error -11: Unknown system error -11, read
+    at Object.readSync (node:fs:978:18)
+    at ModuleLoader.load (node:internal/modules/esm/loader:790:26) {
+  errno: -11,
+  code: 'Unknown system error -11',
+  syscall: 'read'
+}
+
+Node.js v26.9.0
+`;
+
+test('clicking the app says it is starting rather than bouncing in silence', () => {
+  const { home, p } = sandbox();
+  const s = stubs(home, `[ -f "${home}/started" ]`);
+  assert.equal(runLauncher(p, home, s.bin).status, 0);
+  const calls = s.read();
+  assert.ok(calls.indexOf('display notification') < calls.indexOf('launchctl [kickstart]'), 'the banner comes first');
+  assert.ok(calls.includes('[Starting Majordomo…]'), calls);
+});
+
+test('a service that crashes is reported at once, not after the whole wait', () => {
+  const sb = sandbox();
+  const home = sb.home;
+  const p: Plan = { ...sb.p, root: path.join(home, 'Documents', 'majordomo') };
+  fs.mkdirSync(path.dirname(p.log), { recursive: true });
+  fs.mkdirSync(path.dirname(p.plist), { recursive: true });
+  fs.writeFileSync(p.plist, mac.agentPlist(p));
+  // An old, unrelated error from an earlier day is not taken for this start's crash.
+  fs.writeFileSync(p.log, 'Error: EADDRINUSE: address already in use\n');
+  const crashFile = path.join(home, 'crash.txt');
+  fs.writeFileSync(crashFile, CLOUD_CRASH);
+  const s = stubs(home, 'false', `cat "${crashFile}" >> "${p.log}";`);
+
+  const started = Date.now();
+  assert.equal(runLauncher(p, home, s.bin, '30').status, 1);
+  assert.ok(Date.now() - started < 10_000, 'it does not sit out the 30-second wait');
+  const calls = s.read();
+  assert.ok(!calls.includes('open ['), 'no window is opened');
+  assert.ok(calls.includes('[activate]'), 'the message is brought to the front');
+  assert.ok(calls.includes('iCloud'), 'an iCloud crash gets the fix for iCloud');
+  assert.ok(calls.includes(`The folder is: ${p.root}`), 'the folder is named, so it can be found');
+  assert.ok(calls.includes('Unknown system error -11'), 'the error is quoted');
+  assert.ok(!calls.includes('at Object.readSync'), 'without the stack trace');
+  assert.ok(!calls.includes('EADDRINUSE'), 'and without older errors');
+});
+
+test('the iCloud read error is recognised however Node words it', () => {
+  assert.ok(mac.cloudOnly(CLOUD_CRASH));
+  assert.ok(mac.cloudOnly('Error: EDEADLK: resource deadlock avoided, read'));
+  assert.ok(!mac.cloudOnly("Error: EPERM: operation not permitted, open 'x'"));
+});
+
 // ----- installing -----
 
 function fakeMac(overrides: Sys = {}) {
@@ -204,6 +262,18 @@ test('installing refuses while a copy started by hand holds the port, and change
   await assert.rejects(mac.install(p, sys), /already running[\s\S]*Control \+ C/);
   assert.ok(!fs.existsSync(path.join(home, 'Applications', 'Majordomo.app')));
   assert.ok(!fs.existsSync(p.plist));
+});
+
+test('a service that cannot read its iCloud files is reported with the way out', async () => {
+  const { home, p } = sandbox();
+  const synced = { ...p, root: path.join(home, 'Documents', 'majordomo') };
+  fs.mkdirSync(path.join(synced.root, 'node_modules'), { recursive: true });
+  fs.mkdirSync(path.dirname(p.log), { recursive: true });
+  fs.writeFileSync(p.log, CLOUD_CRASH);
+  const { sys, said } = fakeMac({ isHealthy: async () => false });
+
+  await assert.rejects(mac.install(synced, sys), /did not start[\s\S]*kept in iCloud[\s\S]*home folder[\s\S]*npm install/);
+  assert.ok(said.join('\n').includes('If iCloud syncs this folder'), 'the risk is mentioned before starting');
 });
 
 test('a service that never answers is reported with its log', async () => {

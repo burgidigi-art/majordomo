@@ -178,37 +178,78 @@ HEALTH=${sh(p.health)}
 LABEL=${sh(LABEL)}
 PLIST=${sh(p.plist)}
 LOG=${sh(p.log)}
+FOLDER=${sh(p.root)}
 WAIT="\${MAJORDOMO_APP_WAIT:-90}"
 DOMAIN="gui/$(id -u)"
 
 up() { curl -fsS -m 2 "$HEALTH" 2>/dev/null | grep -q majordomo; }
 
+# A banner, so a click is never met with silence while the service starts.
+note() {
+  osascript -e 'on run argv' \\
+    -e 'display notification (item 1 of argv) with title "${APP_NAME}"' \\
+    -e 'end run' -- "$1" >/dev/null 2>&1
+}
+
+# A dialog brought to the front, so it cannot open unseen behind other windows.
 tell() {
   osascript -e 'on run argv' \\
+    -e 'activate' \\
     -e 'display dialog (item 1 of argv) with title "${APP_NAME}" buttons {"OK"} default button 1 with icon caution' \\
     -e 'end run' -- "$1" >/dev/null 2>&1
 }
 
+size() { if [ -f "$LOG" ]; then wc -c < "$LOG" | tr -d ' '; else echo 0; fi; }
+
+# What the service has written since this click. The log is only appended to while it runs.
+since() { tail -c "+$((START + 1))" "$LOG" 2>/dev/null; }
+
+running() { launchctl print "$DOMAIN/$LABEL" 2>/dev/null | grep -q 'state = running'; }
+
+# A crash at start-up leaves an error in the log and the service stopped. launchd retries every
+# 10 seconds, which only repeats it, so stop waiting as soon as that happens.
+crashed() {
+  since | grep -qE '^([A-Za-z]*Error|node:internal)|Unknown system error|operation not permitted|Resource deadlock' && ! running
+}
+
 # The service normally starts at login. If it is not answering, load it (in case it was switched
 # off) and start it, then give it time: after an update it rebuilds the dashboard first.
+START=0
 if ! up; then
+  note "Starting Majordomo…"
+  START="$(size)"
   launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null
   launchctl kickstart "$DOMAIN/$LABEL" 2>/dev/null
   tries=$((WAIT * 2))
-  while [ "$tries" -gt 0 ] && ! up; do
+  while [ "$tries" -gt 0 ] && ! up && ! crashed; do
     sleep 0.5
     tries=$((tries - 1))
   done
 fi
 
 if ! up; then
-  recent="$(tail -n 8 "$LOG" 2>/dev/null)"
+  recent="$(since | grep -v '^[[:space:]]*at ' | tail -n 8)"
+  [ -n "$recent" ] || recent="$(tail -n 8 "$LOG" 2>/dev/null)"
   if [ ! -f "$PLIST" ]; then
-    why="Its background service is not installed. In Terminal, in the Majordomo folder, run: npm run install-app"
+    why="Its background service is not installed. In Terminal, run these two commands:
+
+cd \\"$FOLDER\\"
+npm run install-app"
+  elif printf '%s' "$recent" | grep -qiE 'Unknown system error -11|Resource deadlock|EDEADLK'; then
+    why="Some of its files are kept in iCloud rather than on this Mac, and macOS does not let a background program download them. This happens when the folder is in Desktop or Documents with iCloud syncing on.
+
+Move the Majordomo folder somewhere iCloud does not sync, such as your home folder, then in Terminal, in its new place, run: npm install, then npm run install-app.
+
+The folder is: $FOLDER"
   elif printf '%s' "$recent" | grep -qi 'operation not permitted'; then
-    why="macOS is not letting it read its own folder. Open System Settings > Privacy & Security > Files and Folders, find node, and switch on the folder Majordomo is kept in. Then open Majordomo again."
+    why="macOS is not letting it read its own folder. Open System Settings > Privacy & Security > Files and Folders, find node, and switch on the folder Majordomo is kept in. Then open Majordomo again.
+
+The folder is: $FOLDER"
   else
-    why="In Terminal, in the Majordomo folder, run: npm run install-app"
+    why="In Terminal, run these two commands:
+
+cd \\"$FOLDER\\"
+npm run install-app"
   fi
   tell "Majordomo did not start.
 
@@ -281,6 +322,14 @@ function writable(dir) {
 export function guardedFolder(root, home) {
   const guarded = ['Documents', 'Desktop', 'Downloads', path.join('Library', 'Mobile Documents'), path.join('Library', 'CloudStorage')];
   return guarded.find((name) => (root + path.sep).startsWith(path.join(home, name) + path.sep)) ?? null;
+}
+
+/**
+ * macOS answers a read of a file that iCloud has moved off the disk with error 11 (EDEADLK) when the
+ * reader is a background program, which cannot ask for the download. Node reports it unnamed.
+ */
+export function cloudOnly(log) {
+  return /Unknown system error -11|Resource deadlock avoided|EDEADLK/i.test(log);
 }
 
 function tail(file, lines) {
@@ -363,16 +412,21 @@ export async function install(p, sys = {}) {
   if (folder) {
     say(`\n  Majordomo is kept in your ${folder} folder, which macOS protects.`);
     say(`  If a box appears asking whether “node” may access files in ${folder}, click Allow.`);
+    say('  If iCloud syncs this folder, macOS can move files out to iCloud, and the background service cannot');
+    say('  bring them back. Keeping Majordomo in your home folder (for example ~/majordomo) avoids that.');
   }
   say('\n  Starting Majordomo…');
   if (!(await until(() => healthy(p.health), waits.start))) {
     const recent = tail(p.log, 15);
     const blocked = /operation not permitted/i.test(recent);
+    const inCloud = cloudOnly(recent);
     throw new Error(
       'The app is installed, but Majordomo did not start in the background.\n' +
-        (blocked
-          ? `macOS is not letting it read this folder. Open System Settings → Privacy & Security → Files and Folders,\nfind “node”, and switch on ${folder ?? 'this folder'}. Then run \`npm run install-app\` again.\n`
-          : '') +
+        (inCloud
+          ? `Some of its files are kept in iCloud rather than on this Mac, and the background service cannot download them.\nMove this folder (${p.root}) somewhere iCloud does not sync, such as your home folder.\nThen, in its new place, run \`npm install\` and \`npm run install-app\`.\n`
+          : blocked
+            ? `macOS is not letting it read this folder. Open System Settings → Privacy & Security → Files and Folders,\nfind “node”, and switch on ${folder ?? 'this folder'}. Then run \`npm run install-app\` again.\n`
+            : '') +
         `\nThe last lines of its log (${p.log}):\n${recent || '(the log is empty)'}`,
     );
   }

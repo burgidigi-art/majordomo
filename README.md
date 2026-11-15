@@ -51,6 +51,11 @@ Telegram bot and reminders work without you starting anything.
 
 - The app holds no copy of the program. It runs this folder, so **keep the folder where it is**. If you move it, run
   `npm run install-app` again.
+- **Keep the folder out of iCloud.** With iCloud's *Desktop & Documents* syncing or *Optimize Mac Storage* on, macOS
+  can move files from those folders to iCloud, and a background service is not allowed to bring them back: it
+  crashes with `Unknown system error -11`. Put Majordomo in your home folder (for example `~/majordomo`) instead.
+- If Majordomo cannot start, clicking the icon says so within a few seconds, names the folder, and shows what went
+  wrong.
 - After updating (`git pull`, then `npm install` if dependencies changed), run `npm run install-app` again. It restarts
   the service on the new version.
 - macOS may tell you a background item was added, and if this folder is inside Documents, Desktop or Downloads it asks
