@@ -1,0 +1,16 @@
+{
+  "name": "majordomo-plugins",
+  "owner": {
+    "name": "Majordomo contributors"
+  },
+  "metadata": {
+    "description": "Plugins that live in the Majordomo repository. Paste this repository's link into Grok Bot (Settings → Plugins) or Cursor (Customize) to install them."
+  },
+  "plugins": [
+    {
+      "name": "grokbot-model-watch",
+      "source": "grokbot-model-watch",
+      "description": "Shows what can actually be known about which model is behind each of your Grok Bots, graded by evidence, and gives Bots a which-model skill and tools to answer honestly."
+    }
+  ]
+}

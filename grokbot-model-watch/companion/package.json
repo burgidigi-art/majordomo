@@ -1,0 +1,18 @@
+{
+  "name": "grokbot-model-watch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "See as much as Cursor lets anyone see about which model is behind each Grok Bot, in real time: a local dashboard, an MCP server your Bots can ask, and an inference-hook receiver.",
+  "bin": {
+    "grokbot-model-watch": "./bin/model-watch.mjs"
+  },
+  "scripts": {
+    "start": "node bin/model-watch.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "license": "MIT"
+}

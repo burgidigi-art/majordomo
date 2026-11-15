@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "afterAgentResponse": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT:-.}/hooks/report-model.mjs\" 2>/dev/null || echo '{}'",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT:-.}/hooks/report-model.mjs\" 2>/dev/null || echo '{}'",
+        "timeout": 5
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "majordomo-plugins",
+  "description": "Plugins that live in the Majordomo repository.",
+  "owner": {
+    "name": "Majordomo contributors"
+  },
+  "plugins": [
+    {
+      "name": "grokbot-model-watch",
+      "description": "Shows what can actually be known about which model is behind each of your Grok Bots, graded by evidence, and gives agents a which-model skill and tools to answer honestly.",
+      "category": "monitoring",
+      "source": { "type": "local", "path": "./grokbot-model-watch" },
+      "homepage": "https://github.com/burgidigi-art/majordomo/tree/main/grokbot-model-watch",
+      "keywords": ["grok bot model watch", "grokbot-model-watch"]
+    }
+  ]
+}
