@@ -1,11 +1,14 @@
-import { ArrowUp, FlaskConical, Square } from 'lucide-react';
+import { ArrowUp, AudioLines, FlaskConical, Square, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { AgentEvent } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { greeting } from '../lib.ts';
+import { say, setVoicePrefs, stopSpeaking, useSpeaker } from '../speaker.ts';
 import { useStore, type StreamingBlock } from '../store.ts';
+import { speakable } from '../voice.ts';
 import { Mic } from './Mic.tsx';
 import { Transcript } from './Transcript.tsx';
+import { VoiceMode } from './VoiceMode.tsx';
 import { attempt } from './ui.tsx';
 
 const NO_EVENTS: AgentEvent[] = [];
@@ -44,6 +47,8 @@ export function Desk() {
   const loadEvents = useStore((s) => s.loadEvents);
 
   const [draft, setDraft] = useState('');
+  const [talking, setTalking] = useState(false);
+  const { prefs } = useSpeaker();
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -68,6 +73,23 @@ export function Desk() {
     const ok = await attempt(() => api.chat(clean));
     if (!ok) setDraft(clean);
   };
+
+  // Read new replies aloud as they arrive, when that is switched on. Voice mode reads its own.
+  const readUpTo = useRef<number | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    const newest = events.reduce((n, e) => Math.max(n, e.id), 0);
+    if (readUpTo.current === null || !prefs.autoRead || talking) {
+      readUpTo.current = newest;
+      return;
+    }
+    for (const e of events) {
+      if (e.id <= readUpTo.current || e.type !== 'text') continue;
+      const text = String(e.data.text ?? '').trim();
+      if (text && !/^<quiet\s*\/>$/.test(text)) void say(speakable(text), `e${e.id}`);
+    }
+    readUpTo.current = newest;
+  }, [events, loaded, prefs.autoRead, talking]);
 
   const empty = loaded && events.length === 0 && !app.pm.busy;
   const hasLiveText = Object.keys(streaming).length > 0;
@@ -123,39 +145,59 @@ export function Desk() {
       </div>
 
       <div className="composer-wrap">
-        <div className="composer">
-          <textarea
-            ref={input}
-            rows={1}
-            value={draft}
-            autoFocus
-            placeholder={empty ? 'Describe a project, a task, or a question…' : 'Message your project manager…'}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-          />
-          <div className="composer-foot">
-            <span className="grow">
-              {app.pm.busy
-                ? 'You can keep typing — new messages are folded in as the manager works.'
-                : 'Enter to send · Shift + Enter for a new line'}
-            </span>
-            <Mic value={draft} onChange={setDraft} focus={() => input.current?.focus()} />
-            {app.pm.busy && !draft.trim() ? (
-              <button className="send stop" title="Stop" aria-label="Stop" onClick={() => void attempt(() => api.stopPm())}>
-                <Square size={13} fill="currentColor" />
+        {talking ? (
+          <VoiceMode onEnd={() => setTalking(false)} />
+        ) : (
+          <div className="composer">
+            <textarea
+              ref={input}
+              rows={1}
+              value={draft}
+              autoFocus
+              placeholder={empty ? 'Describe a project, a task, or a question…' : 'Message your project manager…'}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <div className="composer-foot">
+              <span className="grow">
+                {app.pm.busy
+                  ? 'You can keep typing — new messages are folded in as the manager works.'
+                  : 'Enter to send · Shift + Enter for a new line'}
+              </span>
+              <button
+                type="button"
+                className={`mic${prefs.autoRead ? ' on' : ''}`}
+                aria-pressed={prefs.autoRead}
+                aria-label="Read replies aloud"
+                title={prefs.autoRead ? 'Reading replies aloud — click to stop' : 'Read the manager’s replies aloud as they arrive'}
+                onClick={() => {
+                  if (prefs.autoRead) stopSpeaking();
+                  setVoicePrefs({ autoRead: !prefs.autoRead });
+                }}
+              >
+                {prefs.autoRead ? <Volume2 size={16} /> : <VolumeX size={16} />}
               </button>
-            ) : (
-              <button className="send" title="Send" aria-label="Send" disabled={!draft.trim()} onClick={() => void send()}>
-                <ArrowUp size={17} />
+              <button type="button" className="mic" aria-label="Talk hands-free" title="Talk hands-free: speak, hear the reply, keep going" onClick={() => setTalking(true)}>
+                <AudioLines size={16} />
               </button>
-            )}
+              <Mic value={draft} onChange={setDraft} focus={() => input.current?.focus()} />
+              {app.pm.busy && !draft.trim() ? (
+                <button className="send stop" title="Stop" aria-label="Stop" onClick={() => void attempt(() => api.stopPm())}>
+                  <Square size={13} fill="currentColor" />
+                </button>
+              ) : (
+                <button className="send" title="Send" aria-label="Send" disabled={!draft.trim()} onClick={() => void send()}>
+                  <ArrowUp size={17} />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -273,6 +273,15 @@ files you send in, and one workspace folder per project. A project can instead p
   wording, at each pause (Chrome and Edge send the audio to Google, Safari to Apple). The first
   time, allow the microphone for the page and, on a Mac, for your browser in System Settings → Privacy & Security →
   Microphone.
+- **Voice mode** — hear the manager instead of reading it.
+  - *Listen* under any reply reads it aloud; the speaker switch in the chat reads every new reply as it arrives.
+  - *Talk* (the sound-wave button) is a hands-free conversation: speak, and what you said is sent when you pause; the
+    reply is read back; then it listens again. Click the circle to finish your turn early or to cut a reply short. Say
+    “stop”, or press Escape or End, to finish.
+  - Replies are read by OpenAI's voices when an OpenAI key is saved, and otherwise by the computer's own voices (free).
+    On a Mac, download a “Premium” or “Enhanced” voice under System Settings → Accessibility → Spoken Content for a much
+    better one. Voice, speed and engine are under Settings → Phone & alerts. Code, tables and links are left on screen
+    rather than read out.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type

@@ -250,6 +250,8 @@ export interface AppState {
   pm: PmStatus;
   telegram: TelegramStatus;
   alerts: AlertSettings;
+  /** Reading replies aloud: whether OpenAI's voices are available (an OpenAI key is saved). */
+  speech: { openai: boolean; voices: string[] };
   limits: Partial<Record<RuntimeId, AccountLimits>>;
   google: GoogleStatus;
   demo: boolean;

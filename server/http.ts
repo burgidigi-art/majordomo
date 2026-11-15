@@ -11,6 +11,7 @@ import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient,
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
+import { speak } from './speech.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
 import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
@@ -239,7 +240,7 @@ app.get('/api/inbox/:name', async (c) => {
 async function pushSettings(): Promise<void> {
   const state = await orch.state();
   // Telegram's status rides along: saving or removing a key changes what can transcribe voice notes.
-  sync({ settings: state.settings, runtimes: state.runtimes, demo: state.demo, telegram: state.telegram });
+  sync({ settings: state.settings, runtimes: state.runtimes, demo: state.demo, telegram: state.telegram, speech: state.speech });
 }
 
 app.put('/api/settings', async (c) => {
@@ -360,6 +361,15 @@ app.post('/api/transcribe', async (c) => {
   const { backend, problem } = resolveVoice();
   if (!backend) return c.json({ error: problem }, 400);
   return c.json({ text: await transcribe({ bytes, ...kind }) });
+});
+
+// ---------- voice mode ----------
+
+/** A reply read aloud with OpenAI's voices. Without an OpenAI key the dashboard uses the computer's own. */
+app.post('/api/speak', async (c) => {
+  const body = await c.req.json<{ text?: string; voice?: string; speed?: number }>();
+  const audio = await speak(String(body.text ?? ''), { voice: body.voice, speed: body.speed }, c.req.raw.signal);
+  return c.body(new Uint8Array(audio), 200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
 });
 
 // ---------- alerts ----------

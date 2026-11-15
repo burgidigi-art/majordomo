@@ -25,8 +25,9 @@ import { Memory } from './components/Memory.tsx';
 import { ProjectDetail, Projects } from './components/Projects.tsx';
 import { Settings } from './components/Settings.tsx';
 import { TeamList } from './components/TeamList.tsx';
-import { attempt, Toaster } from './components/ui.tsx';
+import { attempt, toast, Toaster } from './components/ui.tsx';
 import { accountName, isLive, useHashRoute } from './lib.ts';
+import { onSpeakerError, setOpenAIAvailable } from './speaker.ts';
 import { connect, useStore } from './store.ts';
 
 type Section = 'dashboard' | 'chat' | 'projects' | 'activity' | 'memory' | 'settings';
@@ -62,7 +63,11 @@ export function App() {
   useEffect(() => {
     void useStore.getState().refresh();
     connect();
+    onSpeakerError((message) => toast(`Could not use the OpenAI voice, so your computer’s voice read it instead. ${message}`, true));
   }, []);
+
+  const openaiVoice = !!app?.speech?.openai;
+  useEffect(() => setOpenAIAvailable(openaiVoice), [openaiVoice]);
 
   const live = app?.tasks.filter(isLive).length ?? 0;
   useEffect(() => {

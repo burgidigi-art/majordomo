@@ -8,6 +8,7 @@ import { googleConnected, googleStatus } from './google.ts';
 import { getLimits } from './limits.ts';
 import { googleTools } from './tools/google.ts';
 import { alerts } from './alerts.ts';
+import { speechStatus } from './speech.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -696,6 +697,7 @@ export const orch: Orch & {
       pm: pmStatus(),
       telegram: telegram.status(),
       alerts: alerts.status(),
+      speech: speechStatus(),
       limits: getLimits(),
       google: googleStatus(),
       demo: DEMO || getSettings().pm.runtime === 'demo',

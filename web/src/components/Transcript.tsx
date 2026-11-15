@@ -16,8 +16,10 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Square,
   SquareTerminal,
   Users,
+  Volume2,
   Wrench,
   X,
   type LucideIcon,
@@ -25,8 +27,32 @@ import {
 import { memo, useMemo, useState } from 'react';
 import type { AgentEvent, Attachment } from '../../../shared/types.ts';
 import { toolName } from '../lib.ts';
+import { say, stopSpeaking, useSpeaker } from '../speaker.ts';
 import type { StreamingBlock } from '../store.ts';
+import { speakable } from '../voice.ts';
 import { Markdown } from './ui.tsx';
+
+/** Read one of the manager's replies aloud, or stop reading it. */
+function SpeakButton({ id, text }: { id: string; text: string }) {
+  const { current } = useSpeaker();
+  const on = current === id;
+  return (
+    <button
+      type="button"
+      className={`speak-btn${on ? ' on' : ''}`}
+      aria-label={on ? 'Stop reading' : 'Read aloud'}
+      title={on ? 'Stop reading' : 'Read aloud'}
+      onClick={() => {
+        if (on) return stopSpeaking();
+        stopSpeaking();
+        void say(speakable(text), id);
+      }}
+    >
+      {on ? <Square size={11} fill="currentColor" /> : <Volume2 size={14} />}
+      <span>{on ? 'Stop' : 'Listen'}</span>
+    </button>
+  );
+}
 
 interface Step {
   id: string;
@@ -321,7 +347,14 @@ export const Transcript = memo(function Transcript({
             }
             return <Brief key={it.key} who={it.from === 'user' ? 'From you' : 'From the project manager'} text={it.text} />;
           case 'text':
-            return <Markdown key={it.key} text={it.text} className={textClass} />;
+            return variant === 'pm' ? (
+              <div key={it.key} className="msg-pm-block">
+                <Markdown text={it.text} className={textClass} />
+                <SpeakButton id={it.key} text={it.text} />
+              </div>
+            ) : (
+              <Markdown key={it.key} text={it.text} className={textClass} />
+            );
           case 'thinking':
             return <Thinking key={it.key} text={it.text} />;
           case 'steps':

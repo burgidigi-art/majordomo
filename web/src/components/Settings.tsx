@@ -2,7 +2,9 @@ import { Check, Copy, Loader2, Mail, Plus, Smartphone, Star, Trash2 } from 'luci
 import { useEffect, useId, useState } from 'react';
 import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
 import { api } from '../api.ts';
+import { browserVoices, say, setVoicePrefs, stopSpeaking, useSpeaker, type VoicePrefs } from '../speaker.ts';
 import { useStore } from '../store.ts';
+import { pickVoice } from '../voice.ts';
 import { attempt, Avatar, toast } from './ui.tsx';
 
 const modelCache = new Map<string, ModelOption[]>();
@@ -348,6 +350,92 @@ function Alerts() {
   );
 }
 
+/** Which voice reads replies aloud. Kept in this browser: the computer's voices differ from machine to machine. */
+function ReadAloud() {
+  const app = useStore((s) => s.app)!;
+  const { prefs, current } = useSpeaker();
+  const [voices, setVoices] = useState(browserVoices);
+  useEffect(() => {
+    if (typeof speechSynthesis === 'undefined') return;
+    const update = () => setVoices(browserVoices());
+    speechSynthesis.addEventListener('voiceschanged', update);
+    update();
+    return () => speechSynthesis.removeEventListener('voiceschanged', update);
+  }, []);
+  const lang = (navigator.language || 'en-US').split('-')[0]!;
+  const mine = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  const best = pickVoice(voices, navigator.language || 'en-US');
+  const openai = prefs.engine === 'openai' || (prefs.engine === 'auto' && app.speech.openai);
+  const previewing = current === 'preview';
+
+  return (
+    <div className="field">
+      <label htmlFor="speak-engine">Reading replies aloud</label>
+      <span className="hint">
+        Used by Listen under a reply, by “read replies aloud” in the chat, and by hands-free voice mode. OpenAI’s voices sound the most
+        natural and need an OpenAI key (billed per use). This computer’s voices are free; on a Mac, the best ones are downloaded under System
+        Settings → Accessibility → Spoken Content → System voice → Manage Voices (look for “Premium” or “Enhanced”).
+      </span>
+      <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <select
+          id="speak-engine"
+          className="select"
+          style={{ width: 230 }}
+          value={prefs.engine}
+          onChange={(e) => setVoicePrefs({ engine: e.target.value as VoicePrefs['engine'] })}
+        >
+          <option value="auto">Automatic{app.speech.openai ? ' (OpenAI)' : ' (this computer)'}</option>
+          <option value="openai" disabled={!app.speech.openai}>
+            OpenAI voices{app.speech.openai ? '' : ' — needs an OpenAI key'}
+          </option>
+          <option value="browser">This computer’s voices</option>
+        </select>
+        {openai ? (
+          <select className="select" style={{ width: 160 }} aria-label="OpenAI voice" value={prefs.openaiVoice} onChange={(e) => setVoicePrefs({ openaiVoice: e.target.value })}>
+            {app.speech.voices.map((v) => (
+              <option key={v} value={v}>
+                {v[0]!.toUpperCase() + v.slice(1)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <select
+            className="select"
+            style={{ width: 230 }}
+            aria-label="Computer voice"
+            value={prefs.browserVoice}
+            onChange={(e) => setVoicePrefs({ browserVoice: e.target.value })}
+          >
+            <option value="">Best available{best ? ` (${best.name})` : ''}</option>
+            {(mine.length ? mine : voices).map((v) => (
+              <option key={v.name} value={v.name}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <select className="select" style={{ width: 150 }} aria-label="Speed" value={prefs.speed} onChange={(e) => setVoicePrefs({ speed: Number(e.target.value) })}>
+          {[0.8, 0.9, 1, 1.1, 1.25, 1.5].map((n) => (
+            <option key={n} value={n}>
+              {n === 1 ? 'Normal speed' : `${n}×`}
+            </option>
+          ))}
+        </select>
+        <button
+          className="btn"
+          onClick={() => {
+            if (previewing) return stopSpeaking();
+            stopSpeaking();
+            void say('Hi, this is how your manager will sound. Three tasks are underway, and I will let you know when they are done.', 'preview');
+          }}
+        >
+          {previewing ? 'Stop' : 'Preview'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Phone() {
   const tg = useStore((s) => s.app!.telegram);
   const [token, setToken] = useState('');
@@ -689,6 +777,9 @@ export function Settings({ section }: { section?: string }) {
           <Phone />
           <div className="card" style={{ padding: 16, marginTop: 14 }}>
             <VoiceNotes voice={app.telegram.voice} />
+          </div>
+          <div className="card" style={{ padding: 16, marginTop: 14 }}>
+            <ReadAloud />
           </div>
         </section>
 
