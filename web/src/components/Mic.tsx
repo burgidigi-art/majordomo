@@ -1,6 +1,6 @@
 import { LoaderCircle, Mic as MicIcon, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { clock, joinDictation, pickEngine, recordingType, speechError } from '../dictation.ts';
+import { clock, joinDictation, pickEngine, punctuate, recordingType, speechError } from '../dictation.ts';
 import { useStore } from '../store.ts';
 import { toast } from './ui.tsx';
 
@@ -91,9 +91,13 @@ export function Mic({ value, onChange, focus }: { value: string; onChange: (text
     rec.continuous = true;
     rec.interimResults = true;
     rec.onresult = (e) => {
-      let text = '';
-      for (let i = 0; i < e.results.length; i++) text += e.results[i]![0]!.transcript;
-      if (!discard.current) put(text);
+      // Finished phrases are punctuated; the one still being spoken is shown as heard.
+      const phrases: string[] = [];
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i]!;
+        phrases.push(r.isFinal ? punctuate(r[0]!.transcript) : r[0]!.transcript.trim());
+      }
+      if (!discard.current) put(phrases.filter(Boolean).join(' '));
     };
     rec.onerror = (e) => {
       const msg = speechError(e.error);
@@ -202,7 +206,11 @@ export function Mic({ value, onChange, focus }: { value: string; onChange: (text
       className="mic"
       onClick={start}
       aria-label="Dictate"
-      title={engine === 'server' ? 'Dictate: speak, then click again to stop' : 'Dictate: the words appear as you speak'}
+      title={
+        engine === 'server'
+          ? 'Dictate: speak, then click again to stop'
+          : 'Dictate with your browser’s speech recognition (basic punctuation). For full punctuation, add an OpenAI or Gemini key under Settings → Phone & alerts.'
+      }
     >
       <MicIcon size={16} />
     </button>

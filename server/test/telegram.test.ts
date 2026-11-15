@@ -360,6 +360,7 @@ test('a voice note is transcribed with an OpenAI key, echoed back, and given to 
   assert.match(form, /name="model"\r\n\r\ngpt-4o-mini-transcribe/);
   assert.match(form, /filename="voice\.ogg"/, 'Telegram’s .oga is sent under a name the API recognises');
   assert.ok(req.raw.includes(tg.audio), 'the recording itself was uploaded');
+  assert.match(form, /name="prompt"\r\n\r\n[^\r]*question mark[^\r]*rising tone/, 'it is asked to punctuate, questions included');
 
   const turn = pmTurns().at(-1)!;
   assert.deepEqual([turn.data.text, turn.data.via, turn.data.voice], ['hi there', 'telegram', true]);
@@ -377,7 +378,9 @@ test('Gemini can transcribe instead, and gets MP3 when ffmpeg can make one', asy
   const req = tg.stt.at(-1)!;
   assert.equal(req.url, '/v1beta/models/gemini-test:generateContent');
   assert.equal(req.headers['x-goog-api-key'], 'test-gemini-key');
-  const part = JSON.parse(req.raw.toString('utf8')).contents[0].parts[1].inline_data;
+  const parts = JSON.parse(req.raw.toString('utf8')).contents[0].parts;
+  assert.match(parts[0].text, /question mark.*rising tone/, 'it is asked to punctuate, questions included');
+  const part = parts[1].inline_data;
   const sent = Buffer.from(part.data, 'base64');
   if (hasFfmpeg) {
     assert.equal(part.mime_type, 'audio/mp3');

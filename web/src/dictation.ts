@@ -23,6 +23,26 @@ export function joinDictation(typed: string, spoken: string): string {
   return /\s$/.test(typed) ? `${typed}${words}` : `${typed} ${words}`;
 }
 
+// A question, judged from its opening words: the browser's recogniser hands over text only, so the
+// rising tone that marks a question is not available to it. Leading fillers ("hey", "so") are skipped.
+const FILLER = '(?:(?:hey|hi|so|and|but|ok|okay|also|well|um|uh|oh|now|then|quick question)[,]?\\s+)*';
+const ASKS =
+  '(?:who|what|when|where|why|how|which|whose|whom|is|are|am|was|were|do|does|did|can|could|would|will|should|shall|may|might|' +
+  "have|has|had|isn't|aren't|wasn't|weren't|don't|doesn't|didn't|can't|couldn't|wouldn't|won't|shouldn't|haven't|hasn't)";
+const QUESTION = new RegExp(`^${FILLER}${ASKS}\\b`, 'i');
+
+/**
+ * The browser's recogniser returns bare words, one phrase per pause. Give each phrase a capital
+ * letter and an ending: a question mark when it opens like a question, otherwise a period.
+ */
+export function punctuate(phrase: string): string {
+  const s = phrase.trim().replace(/\s+/g, ' ');
+  if (!s) return '';
+  const cap = s[0]!.toUpperCase() + s.slice(1);
+  if (/[.?!,;:…]$/.test(cap)) return cap;
+  return `${cap}${QUESTION.test(cap) ? '?' : '.'}`;
+}
+
 /** The recording format to ask for: the first one this browser can make that the transcriber reads. */
 export function recordingType(supported: (type: string) => boolean): string {
   return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find(supported) ?? '';

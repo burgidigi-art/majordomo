@@ -231,8 +231,9 @@ function VoiceNotes({ voice }: { voice: VoiceStatus }) {
       <label htmlFor="voice-provider">Voice notes and dictation</label>
       <span className="hint">
         Turns speech into text for voice notes sent from your phone and for the microphone button in the dashboard. Claude cannot transcribe
-        audio, so this needs an OpenAI or Gemini key, or a transcriber of your own. With none, the dashboard’s microphone uses your browser’s
-        own speech recognition instead (Chrome and Edge send the audio to Google, Safari to Apple).
+        audio, so this needs an OpenAI or Gemini key, or a transcriber of your own. These hear your voice, so they punctuate properly and
+        catch a question from a rising tone. With none, the dashboard’s microphone falls back to your browser’s own speech recognition, which
+        only gets basic punctuation guessed from the words (Chrome and Edge send the audio to Google, Safari to Apple).
       </span>
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <select

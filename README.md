@@ -267,8 +267,10 @@ files you send in, and one workspace folder per project. A project can instead p
   waits for the signed Mac app.
 - **Dictation** — the microphone beside Send, in the chat and in every agent's panel. Click, speak, click again; the
   words land after what you typed, for you to read over and send. Escape throws a take away. It uses the transcriber
-  set up for voice notes (Settings → Phone & alerts) when there is one, and otherwise your browser's own speech
-  recognition, which shows the words as you speak (Chrome and Edge send the audio to Google, Safari to Apple). The first
+  set up for voice notes (Settings → Phone & alerts) when there is one: those models hear your voice, so they punctuate
+  properly and mark a question from a rising tone. Otherwise it uses your browser's own speech recognition, which shows
+  the words as you speak but returns them bare; Majordomo adds a capital, and a period or question mark judged from the
+  wording, at each pause (Chrome and Edge send the audio to Google, Safari to Apple). The first
   time, allow the microphone for the page and, on a Mac, for your browser in System Settings → Privacy & Security →
   Microphone.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting

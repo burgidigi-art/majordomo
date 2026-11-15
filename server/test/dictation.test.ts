@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
-import { clock, joinDictation, pickEngine, recordingType, speechError } from '../../web/src/dictation.ts';
+import { clock, joinDictation, pickEngine, punctuate, recordingType, speechError } from '../../web/src/dictation.ts';
 import { tempHome } from './helpers.ts';
 
 // Dictation in the dashboard: the browser records, the voice-note transcriber writes it down.
@@ -86,6 +86,18 @@ test('spoken words go after what was typed, with one space', () => {
   assert.equal(joinDictation('Draft three posts', 'about the launch'), 'Draft three posts about the launch');
   assert.equal(joinDictation('Line one\n', 'line two'), 'Line one\nline two');
   assert.equal(joinDictation('Keep this', '   '), 'Keep this', 'silence changes nothing');
+});
+
+test('a phrase from the browser gets a capital and a period, or a question mark when it asks', () => {
+  assert.equal(punctuate('hey just testing out the dictation'), 'Hey just testing out the dictation.');
+  assert.equal(punctuate('can you check my inbox'), 'Can you check my inbox?');
+  assert.equal(punctuate('hey so what did the social bot finish today'), 'Hey so what did the social bot finish today?');
+  assert.equal(punctuate("didn't we post that already"), "Didn't we post that already?");
+  assert.equal(punctuate('I wonder if it works'), 'I wonder if it works.', 'a statement about a question is a statement');
+  assert.equal(punctuate('whatever works best'), 'Whatever works best.', 'whole words only');
+  assert.equal(punctuate('Is it done?'), 'Is it done?', 'punctuation already there is kept');
+  assert.equal(punctuate('  draft   three posts '), 'Draft three posts.');
+  assert.equal(punctuate('   '), '');
 });
 
 test('the recording format is the first the browser can make', () => {

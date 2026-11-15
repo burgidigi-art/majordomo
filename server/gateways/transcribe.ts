@@ -17,6 +17,14 @@ import { getSecret } from '../settings.ts';
 
 const DEFAULTS: VoiceSettings = { provider: 'auto', model: '', command: '' };
 const OPENAI_MODEL = 'gpt-4o-mini-transcribe';
+
+/**
+ * How the words should be written down. These models hear the voice, so they can tell a question
+ * from a statement by its rising tone even when the words alone could be either.
+ */
+export const STYLE =
+  'Write it as properly punctuated text with normal capitalization. End each sentence with a period, ' +
+  'and end every question with a question mark, including questions that are only marked by a rising tone of voice.';
 const GEMINI_MODEL = 'gemini-flash-latest';
 
 export interface Audio {
@@ -116,7 +124,8 @@ async function viaOpenAI(audio: Audio, model: string, signal: AbortSignal): Prom
   const ext = audio.ext === 'oga' ? 'ogg' : audio.ext;
   try {
     const file = await toFile(audio.bytes, `voice.${ext}`, { type: audio.mime });
-    const res = await client.audio.transcriptions.create({ file, model }, { signal });
+    // Whisper-family models take the prompt as an example of the style to write in.
+    const res = await client.audio.transcriptions.create({ file, model, prompt: STYLE }, { signal });
     return res.text ?? '';
   } catch (err) {
     throw new Error(describeOpenAIError(err) ?? (err instanceof Error ? err.message : String(err)));
@@ -155,6 +164,7 @@ async function viaGemini(audio: Audio, model: string, signal: AbortSignal): Prom
             {
               text:
                 'Transcribe this voice note exactly as spoken, in the language it is spoken in. ' +
+                `${STYLE} ` +
                 'Reply with the transcript only: no commentary, no quotation marks, no timestamps. ' +
                 'If there is no intelligible speech, reply with nothing at all.',
             },
