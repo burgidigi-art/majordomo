@@ -6,6 +6,7 @@ import { compact, duration, isLive, money, taskElapsed, useNow } from '../lib.ts
 import { useStore, type StreamingBlock } from '../store.ts';
 import { useStickToBottom } from './Desk.tsx';
 import { ApprovalCard } from './CrewRail.tsx';
+import { Mic } from './Mic.tsx';
 import { Transcript } from './Transcript.tsx';
 import { attempt, StatusPill, TaskAvatar } from './ui.tsx';
 
@@ -193,6 +194,7 @@ export function AgentDrawer() {
                 }
               }}
             />
+            <Mic value={draft} onChange={setDraft} />
             <button className="send" aria-label="Send to agent" disabled={!draft.trim()} onClick={() => void send()}>
               <ArrowUp size={17} />
             </button>

@@ -228,10 +228,11 @@ function VoiceNotes({ voice }: { voice: VoiceStatus }) {
 
   return (
     <div className="field">
-      <label htmlFor="voice-provider">Voice notes</label>
+      <label htmlFor="voice-provider">Voice notes and dictation</label>
       <span className="hint">
-        Send a voice note and it is transcribed, shown back to you as “Heard: …”, then handled like a typed message. Claude cannot transcribe
-        audio, so this needs an OpenAI or Gemini key, or a transcriber of your own.
+        Turns speech into text for voice notes sent from your phone and for the microphone button in the dashboard. Claude cannot transcribe
+        audio, so this needs an OpenAI or Gemini key, or a transcriber of your own. With none, the dashboard’s microphone uses your browser’s
+        own speech recognition instead (Chrome and Edge send the audio to Google, Safari to Apple).
       </span>
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <select
@@ -284,8 +285,8 @@ function VoiceNotes({ voice }: { voice: VoiceStatus }) {
       </div>
       {draft.provider === 'command' && (
         <span className="hint">
-          Any command that prints the spoken words. <span className="mono">{'{file}'}</span> is replaced with the path of the recording (Ogg/Opus);
-          nothing leaves this computer.
+          Any command that prints the spoken words. <span className="mono">{'{file}'}</span> is replaced with the path of the recording (Ogg/Opus
+          from Telegram, WebM or MP4 from the dashboard); nothing leaves this computer.
         </span>
       )}
       {voice.using ? (
@@ -461,7 +462,6 @@ function Phone() {
               </div>
             </span>
           </label>
-          <VoiceNotes voice={tg.voice} />
         </>
       )}
 
@@ -686,6 +686,9 @@ export function Settings({ section }: { section?: string }) {
           </p>
           <Alerts />
           <Phone />
+          <div className="card" style={{ padding: 16, marginTop: 14 }}>
+            <VoiceNotes voice={app.telegram.voice} />
+          </div>
         </section>
 
         <section className="section" id="google">

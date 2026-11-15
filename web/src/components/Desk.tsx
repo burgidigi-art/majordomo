@@ -4,6 +4,7 @@ import type { AgentEvent } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { greeting } from '../lib.ts';
 import { useStore, type StreamingBlock } from '../store.ts';
+import { Mic } from './Mic.tsx';
 import { Transcript } from './Transcript.tsx';
 import { attempt } from './ui.tsx';
 
@@ -143,6 +144,7 @@ export function Desk() {
                 ? 'You can keep typing — new messages are folded in as the manager works.'
                 : 'Enter to send · Shift + Enter for a new line'}
             </span>
+            <Mic value={draft} onChange={setDraft} focus={() => input.current?.focus()} />
             {app.pm.busy && !draft.trim() ? (
               <button className="send stop" title="Stop" aria-label="Stop" onClick={() => void attempt(() => api.stopPm())}>
                 <Square size={13} fill="currentColor" />

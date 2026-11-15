@@ -1426,6 +1426,52 @@ a:hover {
   font-size: 12px;
   color: var(--text-3);
 }
+.mic {
+  height: 34px;
+  min-width: 34px;
+  padding: 0 9px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: none;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  transition: color 0.12s, background 0.12s;
+}
+.mic:not(:disabled):hover {
+  color: var(--text);
+}
+.mic:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mic.live {
+  color: #fff;
+  background: var(--bad);
+  border-color: transparent;
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+.mic.busy {
+  color: var(--text-2);
+}
+.mic-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+@keyframes mic-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--bad) 22%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mic.live {
+    animation: none;
+  }
+}
+
 .send {
   width: 34px;
   height: 34px;

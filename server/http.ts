@@ -11,6 +11,7 @@ import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient,
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
+import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
 import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
 import { orch, runner, tick } from './orchestrator.ts';
@@ -345,6 +346,20 @@ app.post('/api/setup/adopt', async (c) => {
   }
   await pushSettings();
   return c.json({ ok: true });
+});
+
+// ---------- dictation ----------
+
+/** Speech typed into the dashboard: the browser records, the voice-note transcriber turns it into text. */
+app.post('/api/transcribe', async (c) => {
+  const kind = uploadedAudio(c.req.header('content-type') ?? '');
+  if (!kind) return c.json({ error: 'That recording is in a format Majordomo does not know.' }, 415);
+  const bytes = Buffer.from(await c.req.arrayBuffer());
+  if (!bytes.length) return c.json({ error: 'The recording was empty. Check that the microphone is allowed.' }, 400);
+  if (bytes.length > 25 * 1024 * 1024) return c.json({ error: 'That recording is too long to transcribe. Keep it under about 20 minutes.' }, 413);
+  const { backend, problem } = resolveVoice();
+  if (!backend) return c.json({ error: problem }, 400);
+  return c.json({ text: await transcribe({ bytes, ...kind }) });
 });
 
 // ---------- alerts ----------

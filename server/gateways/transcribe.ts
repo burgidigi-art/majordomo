@@ -33,6 +33,27 @@ interface Backend {
   label: string;
 }
 
+/**
+ * What a browser recording is, from the type it was uploaded with. Chrome records WebM, Safari MP4,
+ * Firefox Ogg; the codec parameter is dropped because the transcription APIs go by the container.
+ */
+export function uploadedAudio(contentType: string): { mime: string; ext: string } | null {
+  const mime = contentType.split(';')[0]!.trim().toLowerCase();
+  const ext: Record<string, string> = {
+    'audio/webm': 'webm',
+    'video/webm': 'webm',
+    'audio/mp4': 'mp4',
+    'audio/x-m4a': 'm4a',
+    'audio/m4a': 'm4a',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+  };
+  return ext[mime] ? { mime: mime === 'video/webm' ? 'audio/webm' : mime, ext: ext[mime]! } : null;
+}
+
 export function getVoiceSettings(): VoiceSettings {
   return { ...DEFAULTS, ...kvGet<Partial<VoiceSettings>>('telegram:voice', {}) };
 }
@@ -119,8 +140,9 @@ function toMp3(bytes: Buffer, signal: AbortSignal): Promise<Buffer | null> {
 }
 
 async function viaGemini(audio: Audio, model: string, signal: AbortSignal): Promise<string> {
-  // Google documents MP3 and WAV everywhere and Ogg only in places, so send MP3 when we can make one.
-  const mp3 = /ogg|opus/.test(audio.mime) ? await toMp3(audio.bytes, signal) : null;
+  // Google documents MP3 and WAV everywhere and other containers (Ogg, WebM from a browser) only in
+  // places, so send MP3 when we can make one.
+  const mp3 = /mpeg|mp3|wav/.test(audio.mime) ? null : await toMp3(audio.bytes, signal);
   const base = (process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
   const res = await fetch(`${base}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
