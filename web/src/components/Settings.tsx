@@ -631,7 +631,7 @@ function Google() {
             send it yourself.
           </li>
           <li>
-            Google has no “drafts only” permission, so the sign-in you approved technically allows sending. Majordomo has no code path that sends,
+            Google has no “drafts only” permission, so the sign-in you approved technically allows sending. Chiba has no code path that sends,
             and refuses the send request outright.
           </li>
           <li>Mail is written by other people. The manager is told to treat what it reads as information, never as instructions.</li>
@@ -759,7 +759,7 @@ export function Settings({ section }: { section?: string }) {
           <h2>Accounts</h2>
           <p>
             Subscriptions are used through each vendor’s own command-line agent, which holds your login — sign in once in a terminal and
-            Majordomo drives it. API keys are billed per token and stay on this computer.
+            Chiba drives it. API keys are billed per token and stay on this computer.
           </p>
           <div className="acct-grid">
             {app.runtimes.map((rt) => (
@@ -772,7 +772,7 @@ export function Settings({ section }: { section?: string }) {
           <h2>Phone &amp; alerts</h2>
           <p>
             Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. Voice notes, photos and
-            files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while Majordomo is running
+            files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while Chiba is running
             here.
           </p>
           <Alerts />
@@ -798,7 +798,7 @@ export function Settings({ section }: { section?: string }) {
         <section className="section" id="plugins">
           <h2>Plugin tools</h2>
           <p>
-            Plugins connect your agents to your other apps and services: Notion, GitHub, a database, a design tool. Majordomo runs them
+            Plugins connect your agents to your other apps and services: Notion, GitHub, a database, a design tool. Chiba runs them
             itself, so every agent on the crew can use them, on any account. Agents look a plugin’s tools up when a task needs them. With
             commands set to “Ask me first”, anything a plugin does that is not read-only waits for your approval, like a shell command.
           </p>

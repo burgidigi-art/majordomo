@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import type { Host, ToolCtx } from '../tools/tool.ts';
 import { tempHome } from './helpers.ts';
 
-// Plugin tools for the whole crew: found in other tools' settings, run by Majordomo, used by any agent.
+// Plugin tools for the whole crew: found in other tools' settings, run by Chiba, used by any agent.
 
 process.env.MAJORDOMO_DEMO = '1';
 tempHome();
@@ -244,7 +244,7 @@ test('a plugin can be added by hand, tested, and removed', async () => {
 
 // ----- agents on a CLI account -----
 
-test('a CLI agent reaches the plugin tools through its own Majordomo endpoint, as itself', async () => {
+test('a CLI agent reaches the plugin tools through its own Chiba endpoint, as itself', async () => {
   const project = await orch.orch.createProject({ name: 'Launch', goal: 'Ship it' });
   const [task] = orch.orch.createTasks(project.id, [{ title: 'Post the news', brief: 'Post it' }]);
   const call = (body: object, token = orch.MCP_TOKEN, id = task!.id) =>
@@ -262,13 +262,13 @@ test('a CLI agent reaches the plugin tools through its own Majordomo endpoint, a
   assert.equal((await call({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, orch.MCP_TOKEN, 'T-999')).status, 404);
 });
 
-test('Claude Code workers use plugins only through Majordomo; Gemini workers get the connection outside the project', async () => {
+test('Claude Code workers use plugins only through Chiba; Gemini workers get the connection outside the project', async () => {
   const cli = await import('../agents/cli.ts');
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'majordomo-ws-'));
   const base = { agentId: 'T-7', model: '', cwd: ws, prompt: 'x', manager: false, signal: new AbortController().signal, mcp: { url: 'http://127.0.0.1:4317/mcp/worker/T-7', token: 'tok' } };
 
   const claude = cli.cliArgs({ ...base, runtime: 'claude-code' });
-  assert.ok(claude.includes('--strict-mcp-config'), 'its own copies of the plugins are not loaded beside Majordomo’s');
+  assert.ok(claude.includes('--strict-mcp-config'), 'its own copies of the plugins are not loaded beside Chiba’s');
   assert.match(claude[claude.indexOf('--allowedTools') + 1]!, /mcp__majordomo/);
   assert.match(claude[claude.indexOf('--mcp-config') + 1]!, /mcp\/worker\/T-7/);
 

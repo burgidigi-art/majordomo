@@ -160,7 +160,7 @@ type Relay = { msg: StreamMessage } | { connected: boolean };
 
 /**
  * Live updates. A browser keeps at most six connections open to one address, and each open stream
- * holds one for good, so with a handful of Majordomo windows open the next one could never load. So
+ * holds one for good, so with a handful of Chiba windows open the next one could never load. So
  * only one window holds the stream (whichever holds the lock) and relays what it receives to the
  * others; when it closes, another takes over. Browsers without locks fall back to a stream per window.
  */

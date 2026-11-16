@@ -62,7 +62,7 @@ test('the background service is described without secrets and survives odd paths
   // The log sits with the data, outside the folders macOS guards.
   assert.equal(p.log, path.join(home, '.majordomo', 'logs', 'server.log'));
   assert.equal(p.url, 'http://localhost:5123');
-  assert.match(mac.infoPlist(p), /<key>CFBundleExecutable<\/key>\s*<string>Majordomo<\/string>/);
+  assert.match(mac.infoPlist(p), /<key>CFBundleExecutable<\/key>\s*<string>Chiba<\/string>/);
 });
 
 test('node is started through the path that survives an upgrade', () => {
@@ -107,7 +107,7 @@ function runLauncher(p: Plan, home: string, bin: string, wait = '5') {
   return spawnSync('bash', [script], { env: { HOME: home, PATH: `${bin}:/usr/bin:/bin`, MAJORDOMO_APP_WAIT: wait }, encoding: 'utf8' });
 }
 
-test('clicking the app opens the dashboard in its own window when Majordomo is running', () => {
+test('clicking the app opens the dashboard in its own window when Chiba is running', () => {
   const { home, p } = sandbox();
   const s = stubs(home, 'true');
   fs.mkdirSync(path.join(home, 'Applications', 'Google Chrome.app'), { recursive: true });
@@ -136,7 +136,7 @@ test('clicking the app starts the service when it is not answering, then opens t
   assert.ok(calls.trim().endsWith('open [http://localhost:4317]'), 'the window opens once it answers');
 });
 
-test('if Majordomo cannot start, the app says why instead of opening a dead page', () => {
+test('if Chiba cannot start, the app says why instead of opening a dead page', () => {
   const { home, p } = sandbox();
   const s = stubs(home, 'false');
   fs.mkdirSync(path.dirname(p.log), { recursive: true });
@@ -174,7 +174,7 @@ test('clicking the app says it is starting rather than bouncing in silence', () 
   assert.equal(runLauncher(p, home, s.bin).status, 0);
   const calls = s.read();
   assert.ok(calls.indexOf('display notification') < calls.indexOf('launchctl [kickstart]'), 'the banner comes first');
-  assert.ok(calls.includes('[Starting Majordomo…]'), calls);
+  assert.ok(calls.includes('[Starting Chiba…]'), calls);
 });
 
 test('a service that crashes is reported at once, not after the whole wait', () => {
@@ -234,12 +234,12 @@ test('installing creates the app and the login service, and removing takes both 
   const { sys, calls, said } = fakeMac();
 
   const { app } = await mac.install(p, sys);
-  assert.equal(app, path.join(home, 'Applications', 'Majordomo.app'));
-  const launcher = path.join(app, 'Contents', 'MacOS', 'Majordomo');
+  assert.equal(app, path.join(home, 'Applications', 'Chiba.app'));
+  const launcher = path.join(app, 'Contents', 'MacOS', 'Chiba');
   assert.ok(fs.statSync(launcher).mode & 0o100, 'the launcher can be run');
   assert.equal(fs.readFileSync(launcher, 'utf8'), mac.launcherScript(p));
   assert.ok(fs.existsSync(path.join(app, 'Contents', 'Info.plist')));
-  assert.equal(fs.readFileSync(path.join(app, 'Contents', 'Resources', 'Majordomo.icns')).subarray(0, 4).toString(), 'icns');
+  assert.equal(fs.readFileSync(path.join(app, 'Contents', 'Resources', 'Chiba.icns')).subarray(0, 4).toString(), 'icns');
   assert.equal(fs.readFileSync(p.plist, 'utf8'), mac.agentPlist(p));
 
   // An earlier copy is stopped before the new one is loaded.
@@ -256,11 +256,21 @@ test('installing creates the app and the login service, and removing takes both 
   assert.ok(!fs.existsSync(p.plist));
 });
 
+test('installing replaces the app from before the rename', async () => {
+  const { home, p } = sandbox();
+  const old = path.join(home, 'Applications', 'Majordomo.app');
+  fs.mkdirSync(path.join(old, 'Contents'), { recursive: true });
+  const { app } = await mac.install(p, fakeMac().sys);
+  assert.equal(path.basename(app), 'Chiba.app');
+  assert.ok(fs.existsSync(app));
+  assert.ok(!fs.existsSync(old), 'the old Majordomo.app is gone, so there are not two');
+});
+
 test('installing refuses while a copy started by hand holds the port, and changes nothing', async () => {
   const { home, p } = sandbox();
   const { sys } = fakeMac({ portInUse: async () => true });
   await assert.rejects(mac.install(p, sys), /already running[\s\S]*Control \+ C/);
-  assert.ok(!fs.existsSync(path.join(home, 'Applications', 'Majordomo.app')));
+  assert.ok(!fs.existsSync(path.join(home, 'Applications', 'Chiba.app')));
   assert.ok(!fs.existsSync(p.plist));
 });
 
@@ -289,7 +299,7 @@ test('a service that never answers is reported with its log', async () => {
 });
 
 test('the app icon is a well-formed icns with a full-size image', () => {
-  const icns = fs.readFileSync(path.join(repo, 'assets', 'Majordomo.icns'));
+  const icns = fs.readFileSync(path.join(repo, 'assets', 'Chiba.icns'));
   assert.equal(icns.subarray(0, 4).toString(), 'icns');
   assert.equal(icns.readUInt32BE(4), icns.length, 'the declared length matches the file');
   const types: string[] = [];

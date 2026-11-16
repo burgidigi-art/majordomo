@@ -1,8 +1,8 @@
 // Plugin tools for the whole crew. Plugins (MCP servers) the user already set up for Claude Code (its
 // own settings and installed plugins), Claude Desktop, Codex or Hermes are found where those tools keep
-// them, more can be added by hand, and Majordomo runs them itself. Every agent, on any account, reaches
+// them, more can be added by hand, and Chiba runs them itself. Every agent, on any account, reaches
 // them through two tools: plugin_tools (what is there, and what each tool takes) and use_plugin_tool.
-// Going through Majordomo means one place to switch them on and off, and that actions are approved
+// Going through Chiba means one place to switch them on and off, and that actions are approved
 // the same way shell commands are.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -69,7 +69,7 @@ export function toDef(raw: any, vars: Record<string, string | undefined> = {}): 
   const x = (s: string) => expand(s, vars);
   const type = String(raw.type ?? raw.transport ?? '').toLowerCase();
   if (raw.url || raw.httpUrl || raw.serverUrl) {
-    if (type === 'sse') return { def: null, unsupported: 'It uses the older SSE connection, which Majordomo does not support yet.' };
+    if (type === 'sse') return { def: null, unsupported: 'It uses the older SSE connection, which Chiba does not support yet.' };
     const headers = Object.fromEntries(Object.entries({ ...stringMap(raw.headers), ...stringMap(raw.http_headers) }).map(([k, v]) => [k, x(v)]));
     // Codex names an environment variable that holds the bearer token.
     if (raw.bearer_token_env_var && process.env[String(raw.bearer_token_env_var)]) headers.Authorization = `Bearer ${process.env[String(raw.bearer_token_env_var)]}`;

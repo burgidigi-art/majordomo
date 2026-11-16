@@ -70,7 +70,7 @@ async function handle(msg: any, tools: Tool[], caller: Caller = managerCaller): 
 }
 
 /**
- * The tools a worker on a CLI account gets from Majordomo: email and calendar when connected, and the
+ * The tools a worker on a CLI account gets from Chiba: email and calendar when connected, and the
  * plugin tools. Calls run as that task, so approvals show which agent is asking.
  */
 function workerEndpointFor(agentId: string): { tools: Tool[]; caller: Caller } | null {

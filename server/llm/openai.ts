@@ -10,7 +10,7 @@ const ENDPOINTS: Record<CompatRuntime, { baseURL: string; headers?: Record<strin
   openai: { baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1' },
   gemini: { baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/' },
   muse: { baseURL: process.env.MUSE_BASE_URL || 'https://api.meta.ai/v1' },
-  openrouter: { baseURL: 'https://openrouter.ai/api/v1', headers: { 'X-Title': 'Majordomo' } },
+  openrouter: { baseURL: 'https://openrouter.ai/api/v1', headers: { 'X-Title': 'Chiba' } },
 };
 
 function client(runtime: CompatRuntime): OpenAI {

@@ -21,7 +21,7 @@ if (reason) {
   console.log(`Building the dashboard (${reason})…`);
   const built = spawnSync(bin('vite'), ['build'], { cwd: root, stdio: 'inherit' });
   if (built.status !== 0) {
-    console.error('\nThe dashboard could not be built. If you have just updated Majordomo, run `npm install` and try again.');
+    console.error('\nThe dashboard could not be built. If you have just updated Chiba, run `npm install` and try again.');
     process.exit(built.status ?? 1);
   }
 }

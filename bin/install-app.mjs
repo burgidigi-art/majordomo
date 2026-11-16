@@ -6,7 +6,7 @@ import { install, plan, uninstall } from './mac-app.mjs';
 const remove = process.argv.includes('--remove');
 
 if (process.platform !== 'darwin') {
-  console.error('The app is for macOS. On this system, run Majordomo with `npm start`.');
+  console.error('The app is for macOS. On this system, run Chiba with `npm start`.');
   process.exit(1);
 }
 
@@ -15,7 +15,7 @@ try {
   if (remove) {
     await uninstall(p);
   } else {
-    console.log('\n  Setting up the Majordomo app…\n');
+    console.log('\n  Setting up the Chiba app…\n');
     const { app } = await install(p);
     // Show that it works: this opens the dashboard the same way clicking the icon does.
     spawnSync('open', [app]);

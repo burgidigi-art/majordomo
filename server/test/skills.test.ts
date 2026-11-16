@@ -174,7 +174,7 @@ test('a repository can be updated and removed, and removing it forgets its switc
   assert.equal(skills.listSkills(true).find((s) => s.name === 'pdf')?.enabled, false);
 });
 
-test('only repositories Majordomo added can be updated or removed', async () => {
+test('only repositories Chiba added can be updated or removed', async () => {
   for (const id of ['..', '../../etc', '.hidden', 'not-there']) {
     const res = await app.request(`/api/skills/repos/${encodeURIComponent(id)}`, { method: 'DELETE', headers: local });
     assert.ok(res.status === 400 || res.status === 404, `${id}: ${res.status}`);

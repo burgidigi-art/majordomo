@@ -81,7 +81,7 @@ export function setGoogleSecrets(next: GoogleSecrets | null): void {
   fs.chmodSync(SECRETS_FILE, 0o600);
 }
 
-/** A plugin's browser sign-in: the client Majordomo registered with its service, and the tokens it got. */
+/** A plugin's browser sign-in: the client Chiba registered with its service, and the tokens it got. */
 export interface PluginAuth {
   /** The plugin's address, so a sign-in is never reused for a different server under the same name. */
   resource: string;
@@ -254,7 +254,7 @@ export const RUNTIMES: RuntimeDef[] = [
     label: 'Claude · subscription',
     auth: 'Your Claude plan, through the Claude Code CLI',
     canManage: true,
-    setupHint: 'Install Claude Code (see the README), sign in once in a terminal with your Claude account, then restart Majordomo.',
+    setupHint: 'Install Claude Code (see the README), sign in once in a terminal with your Claude account, then restart Chiba.',
     defaultModel: '',
   },
   {
@@ -372,7 +372,7 @@ export async function runtimeStatus(): Promise<RuntimeInfo[]> {
             ? `Found ${found.version}${where}`
             : found.impostor
               ? `The \`${CLI[id].command}\` command on this computer is a different program (${found.impostor}), not ${CLI[id].product}.`
-              : 'Not installed, or not where Majordomo looks for it',
+              : 'Not installed, or not where Chiba looks for it',
           keySource: null,
         };
       }

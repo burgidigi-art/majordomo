@@ -1,4 +1,4 @@
-# Majordomo
+# Chiba
 
 A personal project manager that runs a crew of AI agents for you.
 
@@ -7,6 +7,9 @@ records the project, breaks it into tasks, hands each task to a worker agent, tr
 reports back. You never juggle threads. A dashboard shows every project, task and agent live.
 
 ![The dashboard: account usage, where work is flowing right now, and what needs you](docs/dashboard.png)
+
+*Chiba was called Majordomo until November 2026. Behind-the-scenes names still say majordomo (the `~/majordomo`
+folder, the `~/.majordomo` data folder and the `MAJORDOMO_…` settings), so nothing you have set up moves or breaks.*
 
 It runs on your own machine and uses the AI accounts you already have: **Claude, OpenAI/ChatGPT, Gemini, Meta Muse
 and OpenRouter**, in any mix.
@@ -38,13 +41,13 @@ npm run demo
 
 ## Mac app
 
-On a Mac you can run Majordomo as an app instead of from a Terminal window:
+On a Mac you can run Chiba as an app instead of from a Terminal window:
 
 ```bash
 npm run install-app
 ```
 
-This adds **Majordomo** to your Applications folder and sets up a background service that starts when you log in.
+This adds **Chiba** to your Applications folder and sets up a background service that starts when you log in.
 Clicking the app opens the dashboard in a window of its own (in Chrome, Edge, Brave, Chromium or Vivaldi if one is
 installed; otherwise in your default browser). Because the service is always running while you are logged in, the
 Telegram bot and reminders work without you starting anything.
@@ -53,8 +56,8 @@ Telegram bot and reminders work without you starting anything.
   `npm run install-app` again.
 - **Keep the folder out of iCloud.** With iCloud's *Desktop & Documents* syncing or *Optimize Mac Storage* on, macOS
   can move files from those folders to iCloud, and a background service is not allowed to bring them back: it
-  crashes with `Unknown system error -11`. Put Majordomo in your home folder (for example `~/majordomo`) instead.
-- If Majordomo cannot start, clicking the icon says so within a few seconds, names the folder, and shows what went
+  crashes with `Unknown system error -11`. Put Chiba in your home folder (for example `~/majordomo`) instead.
+- If Chiba cannot start, clicking the icon says so within a few seconds, names the folder, and shows what went
   wrong.
 - After updating (`git pull`, then `npm install` if dependencies changed), run `npm run install-app` again. It restarts
   the service on the new version.
@@ -62,7 +65,7 @@ Telegram bot and reminders work without you starting anything.
   once whether “node” may access that folder. Allow it.
 - API keys exported in your shell are not visible to the service. Paste them in **Settings → Accounts** instead.
 - The service writes its output to `~/.majordomo/logs/server.log`.
-- While the service is running, `npm start` reports that Majordomo is already running rather than starting a second
+- While the service is running, `npm start` reports that Chiba is already running rather than starting a second
   copy.
 
 To remove the app and stop the service (your projects, settings and keys are kept):
@@ -93,7 +96,7 @@ curl -fsSL https://claude.ai/install.sh | bash
 ~/.local/bin/claude
 ```
 
-Choose your Claude account when it asks how to sign in, then restart Majordomo.
+Choose your Claude account when it asks how to sign in, then restart Chiba.
 
 **If another program already answers to `claude`** (a Hermes Agent profile named "claude" does, and its shortcut
 lives at that same `~/.local/bin/claude`), the installer cannot create its launcher and the command above opens
@@ -104,12 +107,12 @@ running it from there:
 "$(ls -t ~/.local/share/claude/versions/* | head -1)"
 ```
 
-Majordomo handles this by itself: it checks that what it finds really is Claude Code, looks in that versions
+Chiba handles this by itself: it checks that what it finds really is Claude Code, looks in that versions
 folder as well as your `PATH`, and says so on the Accounts page if all it can find is the other program. Your
 other program's shortcut is left alone.
 
-**Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; Majordomo starts it
-headless with a task and turns its event stream into dashboard activity. Majordomo never sees or stores your
+**Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; Chiba starts it
+headless with a task and turns its event stream into dashboard activity. Chiba never sees or stores your
 subscription credentials. Usage counts against your plan's limits, and each vendor's terms decide what automated use
 your plan allows — check them if you intend to run this heavily.
 
@@ -120,11 +123,11 @@ Press **Test** / **Check sign-in** on an account card to confirm it works before
 
 ## Message it from your phone
 
-Majordomo can be reached through a Telegram bot, so you can start a project, ask where things stand, or approve a
+Chiba can be reached through a Telegram bot, so you can start a project, ask where things stand, or approve a
 command while you are away from the computer.
 
 1. In Telegram, open a chat with **@BotFather**, send `/newbot`, and follow the prompts. It gives you a token.
-2. In Majordomo, go to **Settings → Phone**, paste the token, and press **Connect**.
+2. In Chiba, go to **Settings → Phone**, paste the token, and press **Connect**.
 3. Open the pairing link shown there on any device signed in to your Telegram account and press **Start**.
 
 ![The Phone panel in Settings, linked and ready](docs/phone.png)
@@ -139,7 +142,7 @@ phone shows up in the dashboard, marked *sent from Telegram*.
 - `/status` shows who is working without involving the manager; `/stop` halts it mid-reply; `/unlink` disconnects
   the chat.
 
-The bot polls Telegram from your computer, so it needs no public address and answers only while Majordomo is
+The bot polls Telegram from your computer, so it needs no public address and answers only while Chiba is
 running. Only chats linked with the one-time pairing code can use it; anyone else who finds the bot gets a refusal
 and never reaches the manager. Text, voice notes, photos and files all work. Messages pass through Telegram's
 servers, as with any bot.
@@ -204,13 +207,13 @@ A draft waits in your Gmail Drafts folder until you send it yourself.
    Publish it ("In production") or Google will make you sign in again every week; you will see a one-time
    "unverified app" warning, which is expected for an app only you use.
 4. Under **Credentials**, create an **OAuth client ID** of type **Desktop app**.
-5. In Majordomo, go to **Settings → Email & calendar**, paste the client ID and secret, and press
+5. In Chiba, go to **Settings → Email & calendar**, paste the client ID and secret, and press
    **Connect Google account**.
 
 Two things worth knowing:
 
-- **"Draft only" is enforced by Majordomo, not by Google.** Google has no drafts-only permission: the one that
-  allows saving a draft also allows sending. Majordomo has no send tool, a single module talks to Gmail, and that
+- **"Draft only" is enforced by Chiba, not by Google.** Google has no drafts-only permission: the one that
+  allows saving a draft also allows sending. Chiba has no send tool, a single module talks to Gmail, and that
   module refuses the send endpoints outright. But the sign-in stored on your computer could technically send if
   other software used it, so treat `~/.majordomo/secrets.json` as you would a password.
 - **Mail is written by strangers.** Everything read from an email or calendar event is handed to the model fenced
@@ -253,7 +256,7 @@ files you send in, and one workspace folder per project. A project can instead p
   manager side by side, then your work, with **What's hot in the streets** down the right. That is GitHub's top 10
   trending repositories today, read from github.com/trending (or, if that page cannot be read, the most-starred
   repositories created this week), each with two lines of description (More shows the rest), its stars and today's
-  gain, a Download link for a .zip and a link to the repository. It refreshes when Majordomo starts, each time the
+  gain, a Download link for a .zip and a link to the repository. It refreshes when Chiba starts, each time the
   dashboard is opened (a list under a minute old is reused), every day at 12:01 am, and with its refresh button.
   Narrow windows move it below the rest; very short ones scroll. Usage orbs for the accounts in use, a live picture of where work is flowing, and
   the state of your projects at a glance.
@@ -275,7 +278,7 @@ files you send in, and one workspace folder per project. A project can instead p
   words land after what you typed, for you to read over and send. Escape throws a take away. It uses the transcriber
   set up for voice notes (Settings → Phone & alerts) when there is one: those models hear your voice, so they punctuate
   properly and mark a question from a rising tone. Otherwise it uses your browser's own speech recognition, which shows
-  the words as you speak but returns them bare; Majordomo adds a capital, and a period or question mark judged from the
+  the words as you speak but returns them bare; Chiba adds a capital, and a period or question mark judged from the
   wording, at each pause (Chrome and Edge send the audio to Google, Safari to Apple). The first
   time, allow the microphone for the page and, on a Mac, for your browser in System Settings → Privacy & Security →
   Microphone.
@@ -289,7 +292,7 @@ files you send in, and one workspace folder per project. A project can instead p
     better one. Voice, speed and engine are under Settings → Phone & alerts. Code, tables and links are left on screen
     rather than read out.
 - **Skills** — Settings → Skills (also in the sidebar). A skill is a folder of instructions, a `SKILL.md` and sometimes
-  scripts, that teaches an agent a kind of work. Majordomo finds the ones already on your computer, wherever Claude Code
+  scripts, that teaches an agent a kind of work. Chiba finds the ones already on your computer, wherever Claude Code
   (including installed plugins), Codex, Hermes or `~/.agents/skills` keep them, and you can add more from any GitHub
   repository (`owner/name`), or search GitHub from the same page (*Find skills on GitHub*: by topic, most-starred or
   best match, with collections tagged as skills marked), then update or remove it later. Every skill switched on is offered to the whole crew on any
@@ -298,15 +301,15 @@ files you send in, and one workspace folder per project. A project can instead p
   your computer start switched on; skills from a repository start **off**, because they are instructions written by
   someone else. Your own skill folders can go in `~/.majordomo/skills/own`.
 - **Plugin tools** — Settings → Plugin tools (also in the sidebar). Plugins (MCP servers) connect agents to your other
-  apps: Notion, GitHub, a database, a design tool. Majordomo finds the ones already set up in Claude Code (its own
+  apps: Notion, GitHub, a database, a design tool. Chiba finds the ones already set up in Claude Code (its own
   settings and installed plugins), Claude Desktop, Codex and Hermes, and you can add more: a command that starts one, or
-  its https address. Majordomo runs them itself, starting each the first time it is needed and stopping it after ten
+  its https address. Chiba runs them itself, starting each the first time it is needed and stopping it after ten
   idle minutes, so every agent on the crew can use them on any account through two tools, `plugin_tools` (what is
   there and what each tool takes) and `use_plugin_tool`. Each task's brief names the plugins switched on. With commands
   set to *Ask me first*, a plugin action that the plugin does not mark read-only waits for your Allow or Decline, like
   a shell command. **Test** starts one and lists its tools.
   - *Sign in.* Hosted plugins such as Notion, Linear, Asana or Figma ask you to sign in through your browser. Click
-    **Sign in**: Majordomo registers itself with the service, opens its sign-in page, and takes over once you approve.
+    **Sign in**: Chiba registers itself with the service, opens its sign-in page, and takes over once you approve.
     The sign-in is kept in `~/.majordomo/secrets.json` and renewed when it runs out; **Sign out** forgets it. A service
     that does not let apps register themselves cannot be signed in to yet.
   - Not yet supported: the older SSE connection type.

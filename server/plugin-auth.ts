@@ -1,7 +1,7 @@
 // Browser sign-in for plugins that need one (Notion, Asana, Linear, Figma and other hosted MCP servers).
 // This is the MCP authorization flow, the same one Claude Code and Claude Desktop use: the plugin says
-// where its sign-in service is, Majordomo registers itself there as an app, the user approves in their
-// browser, and the service sends back a code that Majordomo trades for tokens. The tokens stay in
+// where its sign-in service is, Chiba registers itself there as an app, the user approves in their
+// browser, and the service sends back a code that Chiba trades for tokens. The tokens stay in
 // ~/.majordomo/secrets.json and are renewed when they run out.
 import { createHash, randomBytes } from 'node:crypto';
 import { getPluginAuth, setPluginAuth, type PluginAuth } from './settings.ts';
@@ -104,7 +104,7 @@ async function register(endpoint: string, redirectUri: string): Promise<{ client
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      client_name: 'Majordomo',
+      client_name: 'Chiba',
       redirect_uris: [redirectUri],
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
@@ -116,7 +116,7 @@ async function register(endpoint: string, redirectUri: string): Promise<{ client
   });
   const json = (await res.json().catch(() => null)) as any;
   if (!res.ok || !json?.client_id) {
-    throw new SignInError(`The sign-in service would not register Majordomo (${json?.error_description ?? json?.error ?? `HTTP ${res.status}`}).`);
+    throw new SignInError(`The sign-in service would not register Chiba (${json?.error_description ?? json?.error ?? `HTTP ${res.status}`}).`);
   }
   return { clientId: String(json.client_id), clientSecret: json.client_secret ? String(json.client_secret) : undefined };
 }
@@ -148,7 +148,7 @@ export async function startPluginSignIn(id: string, name: string, mcpUrl: string
     client = { clientId: before.clientId, clientSecret: before.clientSecret };
   } else {
     if (!found.registrationEndpoint) {
-      throw new SignInError(`${name}'s sign-in service does not let apps register themselves, so Majordomo cannot sign in to it yet.`);
+      throw new SignInError(`${name}'s sign-in service does not let apps register themselves, so Chiba cannot sign in to it yet.`);
     }
     client = await register(found.registrationEndpoint, redirectUri);
   }

@@ -58,7 +58,7 @@ function HotRow({ repo }: { repo: TrendingRepo }) {
 }
 
 /**
- * What's hot in the streets: GitHub's top 10 trending repositories today. Refreshed when Majordomo
+ * What's hot in the streets: GitHub's top 10 trending repositories today. Refreshed when Chiba
  * starts, when the dashboard opens, and every day at 12:01 am; the list scrolls on its own.
  */
 export function HotInTheStreets({ trending }: { trending: TrendingState }) {

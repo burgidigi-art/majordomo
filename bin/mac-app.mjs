@@ -1,6 +1,6 @@
 // The Mac app: a small launcher in Applications plus a background service that macOS starts at login.
 //
-// Majordomo.app holds no copy of the program. It asks the service (a launchd agent running this
+// Chiba.app holds no copy of the program. It asks the service (a launchd agent running this
 // checkout with `node bin/majordomo.mjs`) to start if it is not answering, then opens the dashboard
 // in a window of its own. Updating is still `git pull`, followed by `npm run install-app`.
 import { spawnSync } from 'node:child_process';
@@ -11,7 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LABEL = 'app.majordomo.server';
-export const APP_NAME = 'Majordomo';
+export const APP_NAME = 'Chiba';
+/** What the app was called before; installing or removing it clears those copies away too. */
+const OLD_APP_NAMES = ['Majordomo'];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Settings a person may have exported in their shell that the service should keep. Never secrets. */
@@ -81,7 +83,7 @@ export function plan({ root = ROOT, env = process.env, home = os.homedir(), exec
     port,
     node,
     script: path.join(root, 'bin', 'majordomo.mjs'),
-    icon: path.join(root, 'assets', 'Majordomo.icns'),
+    icon: path.join(root, 'assets', 'Chiba.icns'),
     version: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version,
     env: serviceEnv,
     // The address the server prints and the one the dashboard has always been opened at.
@@ -144,7 +146,7 @@ export function infoPlist(p) {
   <key>CFBundleDisplayName</key>
   <string>${APP_NAME}</string>
   <key>CFBundleIdentifier</key>
-  <string>app.majordomo.launcher</string>
+  <string>app.chiba.launcher</string>
   <key>CFBundleExecutable</key>
   <string>${APP_NAME}</string>
   <key>CFBundleIconFile</key>
@@ -216,7 +218,7 @@ crashed() {
 # off) and start it, then give it time: after an update it rebuilds the dashboard first.
 START=0
 if ! up; then
-  note "Starting Majordomo…"
+  note "Starting Chiba…"
   START="$(size)"
   launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null
   launchctl kickstart "$DOMAIN/$LABEL" 2>/dev/null
@@ -238,11 +240,11 @@ npm run install-app"
   elif printf '%s' "$recent" | grep -qiE 'Unknown system error -11|Resource deadlock|EDEADLK'; then
     why="Some of its files are kept in iCloud rather than on this Mac, and macOS does not let a background program download them. This happens when the folder is in Desktop or Documents with iCloud syncing on.
 
-Move the Majordomo folder somewhere iCloud does not sync, such as your home folder, then in Terminal, in its new place, run: npm install, then npm run install-app.
+Move the Chiba folder somewhere iCloud does not sync, such as your home folder, then in Terminal, in its new place, run: npm install, then npm run install-app.
 
 The folder is: $FOLDER"
   elif printf '%s' "$recent" | grep -qi 'operation not permitted'; then
-    why="macOS is not letting it read its own folder. Open System Settings > Privacy & Security > Files and Folders, find node, and switch on the folder Majordomo is kept in. Then open Majordomo again.
+    why="macOS is not letting it read its own folder. Open System Settings > Privacy & Security > Files and Folders, find node, and switch on the folder Chiba is kept in. Then open Chiba again.
 
 The folder is: $FOLDER"
   else
@@ -251,7 +253,7 @@ The folder is: $FOLDER"
 cd \\"$FOLDER\\"
 npm run install-app"
   fi
-  tell "Majordomo did not start.
+  tell "Chiba did not start.
 
 $why
 
@@ -364,7 +366,7 @@ export async function install(p, sys = {}) {
   stopService(run, uid);
   if (!(await until(async () => !(await busy(p.port)), waits.release))) {
     throw new Error(
-      `Majordomo is already running here (something is using port ${p.port}).\n` +
+      `Chiba is already running here (something is using port ${p.port}).\n` +
         'If it is running in a Terminal window, click that window and press Control + C to stop it.\n' +
         'Then run `npm run install-app` again.',
     );
@@ -377,7 +379,7 @@ export async function install(p, sys = {}) {
   // The app goes in the main Applications folder when this account may write there.
   const appDir = p.appDirs.find(writable) ?? p.appDirs[p.appDirs.length - 1];
   fs.mkdirSync(appDir, { recursive: true });
-  for (const dir of p.appDirs) fs.rmSync(path.join(dir, `${APP_NAME}.app`), { recursive: true, force: true });
+  for (const dir of p.appDirs) for (const name of [APP_NAME, ...OLD_APP_NAMES]) fs.rmSync(path.join(dir, `${name}.app`), { recursive: true, force: true });
   const app = path.join(appDir, `${APP_NAME}.app`);
   const contents = path.join(app, 'Contents');
   fs.mkdirSync(path.join(contents, 'MacOS'), { recursive: true });
@@ -410,18 +412,18 @@ export async function install(p, sys = {}) {
 
   const folder = guardedFolder(p.root, p.home);
   if (folder) {
-    say(`\n  Majordomo is kept in your ${folder} folder, which macOS protects.`);
+    say(`\n  Chiba is kept in your ${folder} folder, which macOS protects.`);
     say(`  If a box appears asking whether “node” may access files in ${folder}, click Allow.`);
     say('  If iCloud syncs this folder, macOS can move files out to iCloud, and the background service cannot');
-    say('  bring them back. Keeping Majordomo in your home folder (for example ~/majordomo) avoids that.');
+    say('  bring them back. Keeping Chiba in your home folder (for example ~/majordomo) avoids that.');
   }
-  say('\n  Starting Majordomo…');
+  say('\n  Starting Chiba…');
   if (!(await until(() => healthy(p.health), waits.start))) {
     const recent = tail(p.log, 15);
     const blocked = /operation not permitted/i.test(recent);
     const inCloud = cloudOnly(recent);
     throw new Error(
-      'The app is installed, but Majordomo did not start in the background.\n' +
+      'The app is installed, but Chiba did not start in the background.\n' +
         (inCloud
           ? `Some of its files are kept in iCloud rather than on this Mac, and the background service cannot download them.\nMove this folder (${p.root}) somewhere iCloud does not sync, such as your home folder.\nThen, in its new place, run \`npm install\` and \`npm run install-app\`.\n`
           : blocked
@@ -431,14 +433,14 @@ export async function install(p, sys = {}) {
     );
   }
 
-  say(`  Majordomo is running  →  ${p.url}\n`);
+  say(`  Chiba is running  →  ${p.url}\n`);
   say(`  Open “${APP_NAME}” from your Applications folder, Launchpad or Spotlight.`);
   say('  To keep it in the Dock: open it, right-click its Dock icon, then Options → Keep in Dock.');
   if (p.shellKeys.length) {
     say(`\n  Note: ${p.shellKeys.join(', ')} ${p.shellKeys.length > 1 ? 'are' : 'is'} set in this Terminal, and the background service cannot see`);
     say('  Terminal settings. Paste those keys in the dashboard under Accounts (or Phone) if you have not already.');
   }
-  say('\n  After updating Majordomo (`git pull`), run `npm run install-app` again to restart it on the new version.');
+  say('\n  After updating Chiba (`git pull`), run `npm run install-app` again to restart it on the new version.');
   say('  To remove the app and stop the service: `npm run uninstall-app`. Your projects and settings are kept.\n');
   return { app };
 }
@@ -448,7 +450,7 @@ export async function uninstall(p, sys = {}) {
   const say = sys.say ?? ((line) => console.log(line));
   stopService(run, sys.uid ?? process.getuid());
   fs.rmSync(p.plist, { force: true });
-  for (const dir of p.appDirs) fs.rmSync(path.join(dir, `${APP_NAME}.app`), { recursive: true, force: true });
-  say('  Removed the Majordomo app and its background service.');
-  say('  Your projects, settings and saved keys are untouched. `npm start` still runs Majordomo from Terminal.\n');
+  for (const dir of p.appDirs) for (const name of [APP_NAME, ...OLD_APP_NAMES]) fs.rmSync(path.join(dir, `${name}.app`), { recursive: true, force: true });
+  say('  Removed the Chiba app and its background service.');
+  say('  Your projects, settings and saved keys are untouched. `npm start` still runs Chiba from Terminal.\n');
 }

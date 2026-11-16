@@ -66,16 +66,16 @@ function Opening() {
       <div style={{ maxWidth: 520, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         {error ? (
           <>
-            <b>Majordomo could not load.</b>
+            <b>Chiba could not load.</b>
             <span className="faint mono" style={{ fontSize: 12.5, overflowWrap: 'anywhere' }}>
               {error}
             </span>
             <span className="faint" style={{ fontSize: 13 }}>
-              Its log is at ~/.majordomo/logs/server.log. If this keeps happening, run npm run install-app again in the Majordomo folder.
+              Its log is at ~/.majordomo/logs/server.log. If this keeps happening, run npm run install-app again in the Chiba folder.
             </span>
           </>
         ) : (
-          <span className="faint">{slow ? 'Still opening the desk… Majordomo is taking longer than usual to answer.' : 'Opening the desk…'}</span>
+          <span className="faint">{slow ? 'Still opening the desk… Chiba is taking longer than usual to answer.' : 'Opening the desk…'}</span>
         )}
         {(error || slow) && (
           <button className="btn" onClick={() => void useStore.getState().refresh()}>
@@ -107,7 +107,7 @@ export function App() {
 
   const live = app?.tasks.filter(isLive).length ?? 0;
   useEffect(() => {
-    document.title = live ? `(${live}) Majordomo` : 'Majordomo';
+    document.title = live ? `(${live}) Chiba` : 'Chiba';
   }, [live]);
 
   if (!app) {
@@ -138,7 +138,7 @@ export function App() {
             <BellRing size={17} />
           </span>
           <span className="brand-text">
-            <div className="brand-name">Majordomo</div>
+            <div className="brand-name">Chiba</div>
             <div className="brand-tag">Your crew, managed</div>
           </span>
         </a>
@@ -217,7 +217,7 @@ export function App() {
       <main className="main">
         <header className="topbar">
           <div className="crumbs">
-            <span className="root">Majordomo</span>
+            <span className="root">Chiba</span>
             <span className="sep">/</span>
             <span className="here truncate">{here}</span>
             <span className={`conn${connected ? '' : ' off'}`} title={connected ? 'Connected' : 'Reconnecting…'} />

@@ -46,7 +46,7 @@ app.use('*', async (c, next) => {
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
-    if (!TOKEN) return c.text('Majordomo only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
+    if (!TOKEN) return c.text('Chiba only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
     const given = url.searchParams.get('token') ?? c.req.header('authorization')?.replace(/^Bearer /, '') ?? cookie(c.req.header('cookie'), 'mj_token');
     if (given !== TOKEN) return c.text('Access token required.', 401);
     if (url.searchParams.has('token')) c.header('Set-Cookie', `mj_token=${TOKEN}; HttpOnly; SameSite=Strict; Path=/`);
@@ -77,7 +77,7 @@ app.onError((err, c) => c.json({ error: describeError(err) }, 400));
 
 // ---------- state + live stream ----------
 
-// A cheap check that this is Majordomo and that it is answering; the Mac app polls it while starting up.
+// A cheap check that this is Chiba and that it is answering; the Mac app polls it while starting up.
 app.get('/api/health', (c) => c.json({ ok: true, app: 'majordomo' }));
 
 app.get('/api/state', async (c) => c.json(await orch.state()));
@@ -359,7 +359,7 @@ app.post('/api/setup/adopt', async (c) => {
 /** Speech typed into the dashboard: the browser records, the voice-note transcriber turns it into text. */
 app.post('/api/transcribe', async (c) => {
   const kind = uploadedAudio(c.req.header('content-type') ?? '');
-  if (!kind) return c.json({ error: 'That recording is in a format Majordomo does not know.' }, 415);
+  if (!kind) return c.json({ error: 'That recording is in a format Chiba does not know.' }, 415);
   const bytes = Buffer.from(await c.req.arrayBuffer());
   if (!bytes.length) return c.json({ error: 'The recording was empty. Check that the microphone is allowed.' }, 400);
   if (bytes.length > 25 * 1024 * 1024) return c.json({ error: 'That recording is too long to transcribe. Keep it under about 20 minutes.' }, 413);
@@ -443,7 +443,7 @@ app.get('/api/plugins/oauth/callback', async (c) => {
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title>` +
         '<style>body{font:16px/1.5 -apple-system,system-ui,sans-serif;background:#0b0b0f;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px}' +
         'main{max-width:420px;text-align:center}h1{font-size:22px;margin:0 0 8px}p{color:#aaa}a{color:#f3b65f}</style>' +
-        `<main><h1>${ok ? '✓ ' : ''}${escape(title)}</h1><p>${escape(body)}</p><p><a href="/#/settings/plugins">Back to Majordomo</a></p></main>` +
+        `<main><h1>${ok ? '✓ ' : ''}${escape(title)}</h1><p>${escape(body)}</p><p><a href="/#/settings/plugins">Back to Chiba</a></p></main>` +
         (ok ? '<script>setTimeout(()=>window.close(),1500)</script>' : ''),
       ok ? 200 : 400,
     );

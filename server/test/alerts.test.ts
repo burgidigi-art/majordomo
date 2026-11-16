@@ -57,13 +57,13 @@ test('an approval waiting on the user posts a Mac notification with a sound', ()
   assert.equal(ran.length, 1);
   assert.equal(ran[0]!.command, 'osascript');
   assert.ok(ran[0]!.args.join(' ').includes('sound name "Glass"'));
-  assert.deepEqual(shown(), [['Majordomo · needs your approval', 'Back office wants to run a command: rm -rf build/']]);
+  assert.deepEqual(shown(), [['Chiba · needs your approval', 'Back office wants to run a command: rm -rf build/']]);
   assert.deepEqual(phone, [], 'approvals reach the phone through their own Allow / Decline message, not this one');
 });
 
 test('a failed task notifies the Mac and the phone, with the first line of the error', () => {
   alerts.taskFailed(task());
-  assert.deepEqual(shown(), [["Majordomo · Social's task failed", 'Draft 5 Instagram captions — The API key was refused (401)']]);
+  assert.deepEqual(shown(), [["Chiba · Social's task failed", 'Draft 5 Instagram captions — The API key was refused (401)']]);
   assert.equal(phone.length, 1);
   assert.ok(phone[0]!.includes('Draft 5 Instagram captions'));
   assert.ok(phone[0]!.includes('The API key was refused (401)'));
