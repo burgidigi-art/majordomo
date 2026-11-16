@@ -229,6 +229,33 @@ export interface AccountLimits {
   at: number;
 }
 
+export type SkillSource = 'majordomo' | 'claude' | 'claude-plugin' | 'agents' | 'codex' | 'hermes' | 'repo';
+
+/** A folder of instructions (SKILL.md) that teaches an agent a kind of work. */
+export interface Skill {
+  /** Stable across scans: where it came from plus its folder. */
+  id: string;
+  name: string;
+  description: string;
+  source: SkillSource;
+  sourceLabel: string;
+  /** For skills from an added repository, which one. */
+  repo?: string;
+  dir: string;
+  file: string;
+  enabled: boolean;
+}
+
+/** A git repository the user added skills from. */
+export interface SkillRepo {
+  id: string;
+  name: string;
+  url: string;
+  updatedAt: number;
+  skills: number;
+  enabled: number;
+}
+
 /** How the user is told when something needs them. */
 export interface AlertSettings {
   /** Notifications are posted through macOS, so only offered there. */

@@ -2425,6 +2425,90 @@ a:hover {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
+/* ---------- skills ---------- */
+
+.link-btn {
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:disabled {
+  opacity: 0.5;
+}
+.skill-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.skill-search svg {
+  position: absolute;
+  left: 11px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+.skill-search .input {
+  width: 100%;
+  padding-left: 32px;
+}
+.skill-group {
+  padding: 0;
+  overflow: hidden;
+}
+.skill-group-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.skill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: inherit;
+}
+.skill-group-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.skill-row {
+  cursor: pointer;
+}
+.skill-row input {
+  margin-top: 3px;
+  flex: none;
+}
+.skill-row:hover {
+  background: var(--surface-2);
+}
+.skill-name {
+  display: block;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.skill-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.skill-path {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .list-row {
   display: flex;
   align-items: flex-start;

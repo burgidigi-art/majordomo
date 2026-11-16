@@ -10,6 +10,7 @@ import {
   PanelRight,
   Settings as SettingsIcon,
   Smartphone,
+  Sparkles,
   Square,
   Users,
   type LucideIcon,
@@ -150,6 +151,7 @@ export function App() {
         <div className="side-label">Tools</div>
         <div className="nav">
           <NavLink href="#/settings/crew" icon={Users} label="Crew" active={section === 'settings' && settingsPart === 'crew'} count={String(app.settings.crew.length)} />
+          <NavLink href="#/settings/skills" icon={Sparkles} label="Skills" active={section === 'settings' && settingsPart === 'skills'} />
           <NavLink href="#/settings/accounts" icon={KeyRound} label="Accounts" active={section === 'settings' && settingsPart === 'accounts'} />
           <NavLink
             href="#/settings/phone"

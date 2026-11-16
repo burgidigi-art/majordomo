@@ -282,6 +282,14 @@ files you send in, and one workspace folder per project. A project can instead p
     On a Mac, download a “Premium” or “Enhanced” voice under System Settings → Accessibility → Spoken Content for a much
     better one. Voice, speed and engine are under Settings → Phone & alerts. Code, tables and links are left on screen
     rather than read out.
+- **Skills** — Settings → Skills (also in the sidebar). A skill is a folder of instructions, a `SKILL.md` and sometimes
+  scripts, that teaches an agent a kind of work. Majordomo finds the ones already on your computer, wherever Claude Code
+  (including installed plugins), Codex, Hermes or `~/.agents/skills` keep them, and you can add more from any GitHub
+  repository (`owner/name`), then update or remove it later. Every skill switched on is offered to the whole crew on any
+  account: each task's brief lists them with where their instructions are, the agent reads one when it fits, and the
+  manager can name one in a brief. Claude Code agents also use their own skills and plugins directly. Skills already on
+  your computer start switched on; skills from a repository start **off**, because they are instructions written by
+  someone else. Your own skill folders can go in `~/.majordomo/skills/own`.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type

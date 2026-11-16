@@ -8,6 +8,7 @@ import { googleConnected, googleStatus } from './google.ts';
 import { getLimits } from './limits.ts';
 import { googleTools } from './tools/google.ts';
 import { alerts } from './alerts.ts';
+import { enabledSkillNames, skillCatalog, skillFolders } from './skills.ts';
 import { speechStatus } from './speech.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
@@ -98,6 +99,13 @@ function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): s
       'Crew:',
       ...s.crew.map((c) => `- ${c.id}${c.id === s.defaultCrewId ? ' (default)' : ''}: ${c.name} — ${c.strengths}`),
     );
+    const skillNames = enabledSkillNames();
+    if (skillNames.length) {
+      const shown = skillNames.slice(0, 60);
+      lines.push(
+        `Skills the crew can use (each agent is told about them and reads the instructions when a task fits; name one in a brief when it clearly applies): ${shown.join(', ')}${skillNames.length > shown.length ? `, and ${skillNames.length - shown.length} more` : ''}`,
+      );
+    }
     const mem = memory.all().slice(-80);
     if (mem.length) lines.push('Memory:', ...mem.map((m) => `- ${m.id}: ${m.text}`));
     const google = googleStatus();
@@ -190,7 +198,8 @@ function firstMessage(t: Task): InboxItem {
     .map((id) => tasks.get(id))
     .filter((d): d is Task => !!d && !!d.result)
     .map((d) => `## ${d.id}: ${d.title}\n${clip(d.result, 8000)}`);
-  const text = `Task ${t.id}: ${t.title}\n\n${t.brief}${deps.length ? `\n\n# Reports from the tasks this one depends on\n\n${deps.join('\n\n')}` : ''}${noteText}`;
+  const skills = skillCatalog({ nativeClaude: t.runtime === 'claude-code' });
+  const text = `Task ${t.id}: ${t.title}\n\n${t.brief}${deps.length ? `\n\n# Reports from the tasks this one depends on\n\n${deps.join('\n\n')}` : ''}${noteText}${skills ? `\n\n${skills}` : ''}`;
   return { from: 'manager', text };
 }
 
@@ -374,6 +383,7 @@ function specFor(id: string): AgentSpec {
     // Agents on a CLI account bring their own tools; email and calendar reach them over MCP.
     mcp: runtimeDef(t.runtime).kind === 'cli' && googleConnected() ? { url: `${baseUrl}/mcp/google`, token: MCP_TOKEN } : undefined,
     cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace }),
+    readDirs: skillFolders(),
   };
 }
 

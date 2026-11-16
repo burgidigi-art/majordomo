@@ -5,6 +5,7 @@ import { api } from '../api.ts';
 import { browserVoices, say, setVoicePrefs, stopSpeaking, useSpeaker, type VoicePrefs } from '../speaker.ts';
 import { useStore } from '../store.ts';
 import { pickVoice } from '../voice.ts';
+import { Skills } from './Skills.tsx';
 import { attempt, Avatar, toast } from './ui.tsx';
 
 const modelCache = new Map<string, ModelOption[]>();
@@ -781,6 +782,16 @@ export function Settings({ section }: { section?: string }) {
           <div className="card" style={{ padding: 16, marginTop: 14 }}>
             <ReadAloud />
           </div>
+        </section>
+
+        <section className="section" id="skills">
+          <h2>Skills</h2>
+          <p>
+            Skills teach your agents particular kinds of work, step by step. Every skill switched on here is offered to the whole crew, on any
+            account: each agent is told what is available and reads a skill’s instructions when its task fits. Skills you installed for Claude
+            Code, Codex or Hermes are found on their own.
+          </p>
+          <Skills />
         </section>
 
         <section className="section" id="google">

@@ -41,6 +41,8 @@ export interface AgentSpec {
   tools: Tool[];
   /** Prepended to the first prompt of a CLI session (workers). */
   cliPreamble?: string;
+  /** Folders outside the workspace the agent may read (where its skills are). */
+  readDirs?: string[];
   mcp?: { url: string; token: string };
 }
 
@@ -167,6 +169,7 @@ export class Runner {
       session,
       mcp: spec.mcp,
       manager: spec.manager,
+      readDirs: spec.readDirs,
       signal,
     });
     if (result.session) {

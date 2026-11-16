@@ -30,6 +30,8 @@ export interface CliTurn {
   mcp?: { url: string; token: string };
   /** PM turns get no shell or file-editing tools. */
   manager: boolean;
+  /** Folders outside the workspace a worker may read: where its skills live. */
+  readDirs?: string[];
   signal: AbortSignal;
 }
 
@@ -84,8 +86,10 @@ const claude: Driver = {
     } else {
       const ask = getSettings().approvalMode === 'ask';
       args.push('--permission-mode', 'acceptEdits');
-      const own = ask ? 'Read,Glob,Grep,WebFetch,WebSearch' : 'Bash,Read,Glob,Grep,WebFetch,WebSearch';
+      // Skill lets Claude Code use the skills and plugins the user installed for it.
+      const own = ask ? 'Read,Glob,Grep,WebFetch,WebSearch,Skill' : 'Bash,Read,Glob,Grep,WebFetch,WebSearch,Skill';
       args.push('--allowedTools', turn.mcp ? `${own},mcp__majordomo` : own);
+      for (const dir of turn.readDirs ?? []) args.push('--add-dir', dir);
     }
     if (turn.mcp) {
       const config = {
@@ -265,6 +269,8 @@ const gemini: Driver = {
     if (session) args.push('--resume', session);
     else args.push('--session-id', (session = randomUUID()));
     args.push('--approval-mode', turn.manager ? 'default' : getSettings().approvalMode === 'ask' ? 'auto_edit' : 'yolo');
+    // Gemini CLI only reads inside the workspace unless told otherwise; skills live elsewhere.
+    if (!turn.manager && turn.readDirs?.length) args.push('--include-directories', turn.readDirs.join(','));
     if (turn.mcp && turn.manager) {
       // Gemini CLI reads MCP servers from the project's .gemini/settings.json. Only the manager's own
       // folder gets one: writing a token into a project workspace is not worth it for a worker.
@@ -335,6 +341,13 @@ const gemini: Driver = {
 };
 
 const DRIVERS: Partial<Record<RuntimeId, Driver>> = { 'claude-code': claude, codex, 'gemini-cli': gemini };
+
+/** The command-line arguments a turn would run with, for tests. */
+export function cliArgs(turn: CliTurn): string[] {
+  const driver = DRIVERS[turn.runtime];
+  if (!driver) throw new Error(`No CLI driver for ${turn.runtime}`);
+  return driver.args(turn).args;
+}
 
 export function runCliTurn(turn: CliTurn): Promise<CliResult> {
   const driver = DRIVERS[turn.runtime];

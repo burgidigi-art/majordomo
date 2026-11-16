@@ -1,4 +1,4 @@
-import type { AgentEvent, AlertSettings, AppState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { AgentEvent, AlertSettings, AppState, Skill, SkillRepo, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -18,6 +18,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T = { ok: true }>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+
+export interface SkillsPayload {
+  skills: Skill[];
+  repos: SkillRepo[];
+  ownFolder: string;
+}
 
 export const api = {
   state: () => request<AppState>('/api/state'),
@@ -47,6 +53,11 @@ export const api = {
   test: (runtime: RuntimeId) => post<{ ok: boolean; message: string }>(`/api/runtimes/${runtime}/test`),
   adopt: (runtime: RuntimeId, model: string) => post('/api/setup/adopt', { runtime, model }),
 
+  skills: (rescan = false) => request<SkillsPayload>(`/api/skills${rescan ? '?rescan=1' : ''}`),
+  setSkills: (ids: string[], enabled: boolean) => request<SkillsPayload>('/api/skills', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
+  addSkillRepo: (url: string) => post<SkillsPayload>('/api/skills/repos', { url }),
+  updateSkillRepo: (id: string) => post<SkillsPayload>(`/api/skills/repos/${encodeURIComponent(id)}/update`),
+  removeSkillRepo: (id: string) => request<SkillsPayload>(`/api/skills/repos/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   saveAlerts: (body: { mac?: boolean; phoneFailures?: boolean }) =>
     request<AlertSettings>('/api/alerts', { method: 'PUT', body: JSON.stringify(body) }),
   saveTelegram: (body: { token?: string; notify?: boolean; voice?: Partial<VoiceSettings> }) =>

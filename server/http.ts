@@ -11,6 +11,7 @@ import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient,
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
+import { addRepo, listRepos, listSkills, removeRepo, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
 import { speak } from './speech.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -361,6 +362,39 @@ app.post('/api/transcribe', async (c) => {
   const { backend, problem } = resolveVoice();
   if (!backend) return c.json({ error: problem }, 400);
   return c.json({ text: await transcribe({ bytes, ...kind }) });
+});
+
+// ---------- skills ----------
+
+const skillsPayload = (force = false) => {
+  const skills = listSkills(force);
+  return { skills, repos: listRepos(), ownFolder: `${SKILLS_DIR}/own` };
+};
+
+app.get('/api/skills', (c) => c.json(skillsPayload(c.req.query('rescan') === '1')));
+
+app.put('/api/skills', async (c) => {
+  const body = await c.req.json<{ ids?: string[]; enabled?: boolean }>();
+  if (!Array.isArray(body.ids) || typeof body.enabled !== 'boolean') return c.json({ error: 'Send ids and enabled.' }, 400);
+  const known = new Set(listSkills().map((s) => s.id));
+  setSkillsEnabled(body.ids.filter((id) => typeof id === 'string' && known.has(id)), body.enabled);
+  return c.json(skillsPayload());
+});
+
+app.post('/api/skills/repos', async (c) => {
+  const body = await c.req.json<{ url?: string }>();
+  await addRepo(String(body.url ?? ''));
+  return c.json(skillsPayload(true));
+});
+
+app.post('/api/skills/repos/:id/update', async (c) => {
+  await updateRepo(c.req.param('id'));
+  return c.json(skillsPayload(true));
+});
+
+app.delete('/api/skills/repos/:id', (c) => {
+  removeRepo(c.req.param('id'));
+  return c.json(skillsPayload(true));
 });
 
 // ---------- voice mode ----------
