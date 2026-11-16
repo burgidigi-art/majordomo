@@ -249,7 +249,13 @@ files you send in, and one workspace folder per project. A project can instead p
 
 ## What you can see and do
 
-- **Dashboard** — the home screen. Usage orbs for the accounts in use, a live picture of where work is flowing, and
+- **Dashboard** — the home screen, sized to fit one window without scrolling: the work flow, then usage and the
+  manager side by side, then your work, with **What's hot in the streets** down the right. That is GitHub's top 10
+  trending repositories today, read from github.com/trending (or, if that page cannot be read, the most-starred
+  repositories created this week), each with two lines of description (More shows the rest), its stars and today's
+  gain, a Download link for a .zip and a link to the repository. It refreshes when Majordomo starts, each time the
+  dashboard is opened (a list under a minute old is reused), every day at 12:01 am, and with its refresh button.
+  Narrow windows move it below the rest; very short ones scroll. Usage orbs for the accounts in use, a live picture of where work is flowing, and
   the state of your projects at a glance.
   - *Usage orbs.* A Claude subscription reports its own allowance, so that orb shows the real share of your weekly
     limit used (with the 5-hour window and reset day beneath it). Accounts that do not report a limit show their

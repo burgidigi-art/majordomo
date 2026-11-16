@@ -1,4 +1,4 @@
-import type { AgentEvent, AlertSettings, AppState, PluginServer, Skill, SkillRepo, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { AgentEvent, AlertSettings, AppState, PluginServer, Skill, SkillRepo, TrendingState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -73,6 +73,8 @@ export const api = {
     post<{ ok: boolean; error?: string; tools?: { name: string; description: string }[]; plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/test`),
   searchSkills: (q: string, sort: 'stars' | 'best') =>
     request<{ repos: FoundRepo[] }>(`/api/skills/search?q=${encodeURIComponent(q)}&sort=${sort}`),
+  /** A fresh list; `force` asks GitHub even if the last list is under a minute old. */
+  refreshTrending: (force = false) => post<TrendingState>(`/api/trending/refresh${force ? '?force=1' : ''}`),
   skills: (rescan = false) => request<SkillsPayload>(`/api/skills${rescan ? '?rescan=1' : ''}`),
   setSkills: (ids: string[], enabled: boolean) => request<SkillsPayload>('/api/skills', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
   addSkillRepo: (url: string) => post<SkillsPayload>('/api/skills/repos', { url }),

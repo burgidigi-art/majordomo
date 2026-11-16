@@ -6,6 +6,7 @@ import { app } from './http.ts';
 import { orch, runner, setBaseUrl } from './orchestrator.ts';
 import { telegram } from './gateways/telegram.ts';
 import { closeAllPlugins } from './plugins.ts';
+import { scheduleTrending } from './trending.ts';
 import { DEMO, getSettings } from './settings.ts';
 
 const port = Number(process.env.MAJORDOMO_PORT || process.env.PORT || 4317);
@@ -28,6 +29,8 @@ setPluginRedirectBase(`http://localhost:${port}`);
 // in the background), so nothing is touched until the port is ours.
 const server = serve({ fetch: app.fetch, port, hostname }, () => {
   orch.boot();
+  // What's hot on GitHub: now, and every day at 12:01 am.
+  if (!process.env.MAJORDOMO_NO_TRENDING) scheduleTrending();
   const s = getSettings();
   console.log(`\n  Majordomo is running  →  http://localhost:${port}`);
   console.log(`  Data: ${DATA_DIR}`);

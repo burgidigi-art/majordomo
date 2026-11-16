@@ -15,6 +15,7 @@ import { finishPluginSignIn } from './plugin-auth.ts';
 import { addOwnServer, afterSignIn, pluginList, removeOwnServer, setPluginsEnabled, signInToPlugin, signOutOfPlugin, testPlugin } from './plugins.ts';
 import { addRepo, listRepos, listSkills, removeRepo, searchSkillRepos, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
 import { speak } from './speech.ts';
+import { refreshTrending } from './trending.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
 import { telegram } from './gateways/telegram.ts';
 import { mcpEndpoint } from './mcp.ts';
@@ -464,6 +465,11 @@ app.post('/api/plugins/:id/test', async (c) => {
     return c.json({ ok: false, error: describeError(err), plugins: pluginList() });
   }
 });
+
+// ---------- what's hot ----------
+
+/** The dashboard asks for a fresh list each time it is opened; a list under a minute old is reused. */
+app.post('/api/trending/refresh', async (c) => c.json(await refreshTrending(c.req.query('force') === '1' ? 0 : 60_000)));
 
 // ---------- voice mode ----------
 

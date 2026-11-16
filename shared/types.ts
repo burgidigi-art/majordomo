@@ -304,6 +304,28 @@ export interface UsageSummary {
   updatedAt: number;
 }
 
+/** One repository in "What's hot in the streets". */
+export interface TrendingRepo {
+  rank: number;
+  name: string;
+  description: string;
+  language: string;
+  stars: number;
+  /** Stars gained today, from the Trending page; null when the list came from search instead. */
+  starsToday: number | null;
+  url: string;
+  /** A .zip of the default branch. */
+  download: string;
+}
+
+export interface TrendingState {
+  repos: TrendingRepo[];
+  /** trending: GitHub's Trending page. new-this-week: the most-starred repositories created this week. */
+  source: 'trending' | 'new-this-week' | 'none';
+  fetchedAt: number;
+  error: string;
+}
+
 /** How the user is told when something needs them. */
 export interface AlertSettings {
   /** Notifications are posted through macOS, so only offered there. */
@@ -326,6 +348,7 @@ export interface AppState {
   telegram: TelegramStatus;
   alerts: AlertSettings;
   usage: UsageSummary;
+  trending: TrendingState;
   /** Reading replies aloud: whether OpenAI's voices are available (an OpenAI key is saved). */
   speech: { openai: boolean; voices: string[] };
   limits: Partial<Record<RuntimeId, AccountLimits>>;

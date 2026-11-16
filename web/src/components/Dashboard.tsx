@@ -1,5 +1,5 @@
 import { Activity as ActivityIcon, ArrowUpRight, BellRing, CheckCircle2, MessageSquareText, Settings as SettingsIcon, ShieldCheck, Zap } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AppState, RuntimeId, RuntimeInfo } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { accountName, compact, isLive, isTrouble, useNow } from '../lib.ts';
@@ -7,6 +7,7 @@ import { useStore } from '../store.ts';
 import { AgentCard } from './CrewRail.tsx';
 import { FlowStage, SparkOrb, type FlowNode } from './Flow.tsx';
 import { ProjectCard } from './Projects.tsx';
+import { HotInTheStreets } from './Hot.tsx';
 import { attempt, Avatar, Empty } from './ui.tsx';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -57,60 +58,29 @@ function useGauges(app: AppState): Gauge[] {
 
 function Usage({ app }: { app: AppState }) {
   const gauges = useGauges(app);
-  const [view, setView] = useState<'orb' | 'bar'>('orb');
   return (
-    <section className="panel orbs" data-n={gauges.length} aria-label="Account usage">
-      <div className="orbs-tools">
-        <div className="mini-seg">
-          <button className={view === 'orb' ? 'on' : ''} onClick={() => setView('orb')}>
-            Orb
-          </button>
-          <button className={view === 'bar' ? 'on' : ''} onClick={() => setView('bar')}>
-            Bar
-          </button>
-        </div>
-        <a className="top-btn" href="#/activity" style={{ fontSize: 11.5, padding: '4px 8px' }}>
-          Details
+    <section className="panel dash-usage" aria-label="Account usage">
+      <div className="row">
+        <div className="eyebrow grow">Usage</div>
+        <a className="pill-btn small" href="#/activity">
+          <ArrowUpRight size={12} /> Details
         </a>
       </div>
-      {view === 'orb' ? (
-        gauges.map((g) => (
-          <div key={g.id} className={`orb-item fam-${g.family}`}>
-            <div className="orb" style={{ ['--fill' as string]: `${g.percent}%` }} role="img" aria-label={`${g.caption}: ${g.percent}%`}>
-              <div className="orb-liquid" />
-              <div className="orb-badge">{g.name[0]}</div>
-            </div>
-            <div className="orb-read">
-              <b>
-                {g.percent}
-                <small>%</small>
-              </b>
-              <div className="orb-cap">{g.caption}</div>
-              {g.notes.map((n) => (
-                <div key={n} className="orb-note">
-                  {n}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))
-      ) : (
-        <div className="usage-bars">
-          {gauges.map((g) => (
-            <div key={g.id} className={`usage-bar fam-${g.family}`}>
-              <Avatar name={g.name} family={g.family} />
-              <div>
-                <div style={{ fontWeight: 600 }}>{g.caption}</div>
-                <div className="track">
-                  <i style={{ width: `${Math.max(2, g.percent)}%` }} />
-                </div>
-                <div className="orb-note">{g.notes.join(' · ')}</div>
+      <div className="usage-bars">
+        {gauges.map((g) => (
+          <div key={g.id} className={`usage-bar fam-${g.family}`} title={[g.caption, ...g.notes].join(' · ')}>
+            <Avatar name={g.name} family={g.family} small />
+            <div style={{ minWidth: 0 }}>
+              <div className="usage-cap truncate">{g.caption}</div>
+              <div className="track" role="img" aria-label={`${g.caption}: ${g.percent}%`}>
+                <i style={{ width: `${Math.max(2, g.percent)}%` }} />
               </div>
-              <div className="pct">{g.percent}%</div>
+              <div className="orb-note truncate">{g.notes.join(' · ')}</div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="pct">{g.percent}%</div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -119,24 +89,26 @@ function ManagerCard({ app, theme }: { app: AppState; theme: string }) {
   const runtime = app.runtimes.find((r) => r.id === app.settings.pm.runtime);
   const accounts = new Set(app.settings.crew.map((c) => c.runtime)).size;
   return (
-    <section className="panel mgr-card" aria-label="Project manager">
-      <div className="eyebrow">Manager</div>
+    <section className="panel dash-mgr" aria-label="Project manager">
       <SparkOrb theme={theme} busy={app.pm.busy} />
-      <h3>{accountName(app.settings.pm.runtime)}</h3>
-      <div className="facts-col">
-        <span className="lead">{app.pm.busy ? 'Working' : 'Standing by'}</span>
+      <div className="dash-mgr-id">
+        <div className="eyebrow">Manager</div>
+        <h3 className="truncate">{accountName(app.settings.pm.runtime)}</h3>
+        <span className={`dash-mgr-state${app.pm.busy ? ' busy' : ''}`}>{app.pm.busy ? 'Working' : 'Standing by'}</span>
+      </div>
+      <div className="dash-mgr-facts">
         <span>{runtime?.kind === 'cli' ? 'Subscription' : app.settings.pm.runtime === 'demo' ? 'Simulated' : 'API key'}</span>
         <span className="mono truncate">{app.settings.pm.model || 'default model'}</span>
         <span>
           {app.settings.crew.length} crew · {accounts} account{accounts === 1 ? '' : 's'}
         </span>
+        <span className="crew-chips">
+          {app.settings.crew.slice(0, 6).map((c) => (
+            <Avatar key={c.id} name={c.name} family={app.runtimes.find((r) => r.id === c.runtime)?.family ?? 'demo'} small />
+          ))}
+        </span>
       </div>
-      <div className="crew-chips">
-        {app.settings.crew.slice(0, 6).map((c) => (
-          <Avatar key={c.id} name={c.name} family={app.runtimes.find((r) => r.id === c.runtime)?.family ?? 'demo'} small />
-        ))}
-      </div>
-      <div className="actions">
+      <div className="dash-mgr-actions">
         <a className="pill-btn gold" href="#/chat">
           <MessageSquareText size={14} /> Chat
         </a>
@@ -183,11 +155,11 @@ function Flow({ app, theme }: { app: AppState; theme: string }) {
   const n = app.settings.maxParallel;
 
   return (
-    <section className="panel flow" aria-label="Where work is flowing">
+    <section className="panel flow dash-flow" aria-label="Where work is flowing">
       <div className="flow-side">
         <div className="row">
           <div className="eyebrow grow">Work flow</div>
-          <a className="pill-btn" style={{ height: 28, padding: '0 11px', fontSize: 11.5 }} href="#/activity">
+          <a className="pill-btn small" href="#/activity">
             <ArrowUpRight size={12} /> Details
           </a>
         </div>
@@ -253,22 +225,16 @@ function Focus({ app }: { app: AppState }) {
           ? 'All caught up.'
           : projects.length
             ? 'Quiet for now.'
-            : 'Room to start.';
+            : '';
   const firstNeed = waiting[0] ?? trouble[0];
 
   return (
     <>
-      <div className="focus-head">
-        <div className="grow">
-          <div className="eyebrow plain">Your work, in focus</div>
-          <h1 className="focus-title">{title}</h1>
-        </div>
-        <a className="pill-btn" href="#/chat">
-          <MessageSquareText size={14} /> Tell your manager something
-        </a>
-      </div>
-      <div className="focus-bar">
-        <div className="tabs-pill" role="tablist">
+      <div className="dash-work-head">
+        <div className="eyebrow plain">Your work</div>
+        {title && <h2 className="dash-work-title truncate">{title}</h2>}
+        <span className="grow" />
+        <div className="tabs-pill small" role="tablist">
           {(
             [
               ['overview', 'Overview'],
@@ -281,18 +247,17 @@ function Focus({ app }: { app: AppState }) {
             </button>
           ))}
         </div>
-        <span className="grow" />
-        <span className="faint" style={{ fontSize: 12 }}>
-          {projects.length} project{projects.length === 1 ? '' : 's'} · {app.tasks.length} task{app.tasks.length === 1 ? '' : 's'} all-time
-        </span>
+        <a className="pill-btn small" href="#/chat" title="Tell your manager something">
+          <MessageSquareText size={13} /> Tell your manager
+        </a>
       </div>
-
+      <div className="dash-work-body">
       {tab === 'overview' && (
         <>
-          <div className="kpis">
+          <div className="kpis slim">
             <a className="kpi" href="#/activity" style={{ ['--k' as string]: 'var(--accent)' }}>
               <h4>
-                <ActivityIcon size={20} /> Working now
+                <ActivityIcon size={15} /> Working now
               </h4>
               <div className="big" style={{ color: live.length ? 'var(--accent)' : undefined }}>
                 {live.length}
@@ -301,7 +266,7 @@ function Focus({ app }: { app: AppState }) {
             </a>
             <a className="kpi" href="#/activity" style={{ ['--k' as string]: 'var(--ok)' }}>
               <h4>
-                <CheckCircle2 size={20} /> Done today
+                <CheckCircle2 size={15} /> Done today
               </h4>
               <div className="big">{doneToday.length}</div>
               <div className="hint">
@@ -310,7 +275,7 @@ function Focus({ app }: { app: AppState }) {
             </a>
             <button className="kpi" style={{ ['--k' as string]: 'var(--attn)' }} onClick={() => (firstNeed ? open(firstNeed.id) : (window.location.hash = '/chat'))}>
               <h4>
-                <BellRing size={20} /> Needs you
+                <BellRing size={15} /> Needs you
               </h4>
               <div className="big" style={{ color: needs ? 'var(--attn)' : undefined }}>
                 {needs}
@@ -361,6 +326,10 @@ function Focus({ app }: { app: AppState }) {
         ) : (
           <Empty title="Nothing has run yet">Agents appear here as soon as your manager assigns work.</Empty>
         ))}
+      </div>
+      <div className="dash-work-foot faint">
+        {projects.length} project{projects.length === 1 ? '' : 's'} · {app.tasks.length} task{app.tasks.length === 1 ? '' : 's'} all-time
+      </div>
     </>
   );
 }
@@ -368,15 +337,22 @@ function Focus({ app }: { app: AppState }) {
 export function Dashboard() {
   const app = useStore((s) => s.app)!;
   const theme = useStore((s) => s.theme);
+  // A fresh "What's hot" list each time the dashboard is opened (one under a minute old is reused).
+  useEffect(() => {
+    void api.refreshTrending().catch(() => {});
+  }, []);
   return (
-    <div className="page">
-      <div className="dash">
-        <div className="dash-top">
+    <div className="page dash-page">
+      <div className="dash2">
+        <Flow app={app} theme={theme} />
+        <div className="dash-status">
           <Usage app={app} />
           <ManagerCard app={app} theme={theme} />
         </div>
-        <Flow app={app} theme={theme} />
-        <Focus app={app} />
+        <section className="panel dash-work" aria-label="Your work">
+          <Focus app={app} />
+        </section>
+        <HotInTheStreets trending={app.trending} />
       </div>
     </div>
   );
