@@ -16,7 +16,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.ts';
 import { Activity } from './components/Activity.tsx';
 import { AgentDrawer } from './components/AgentDrawer.tsx';
@@ -53,6 +53,40 @@ function NavLink({ href, icon: Icon, label, active, count, hot }: { href: string
   );
 }
 
+/** Shown until the server answers; if it cannot, says why and offers to try again. */
+function Opening() {
+  const error = useStore((s) => s.loadError);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 8000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{ display: 'grid', placeItems: 'center', height: '100dvh', padding: 16 }}>
+      <div style={{ maxWidth: 520, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+        {error ? (
+          <>
+            <b>Majordomo could not load.</b>
+            <span className="faint mono" style={{ fontSize: 12.5, overflowWrap: 'anywhere' }}>
+              {error}
+            </span>
+            <span className="faint" style={{ fontSize: 13 }}>
+              Its log is at ~/.majordomo/logs/server.log. If this keeps happening, run npm run install-app again in the Majordomo folder.
+            </span>
+          </>
+        ) : (
+          <span className="faint">{slow ? 'Still opening the desk… Majordomo is taking longer than usual to answer.' : 'Opening the desk…'}</span>
+        )}
+        {(error || slow) && (
+          <button className="btn" onClick={() => void useStore.getState().refresh()}>
+            Try again
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const app = useStore((s) => s.app);
   const connected = useStore((s) => s.connected);
@@ -77,11 +111,7 @@ export function App() {
   }, [live]);
 
   if (!app) {
-    return (
-      <div style={{ display: 'grid', placeItems: 'center', height: '100dvh' }} className="faint">
-        Opening the desk…
-      </div>
-    );
+    return <Opening />;
   }
 
   const section = sectionOf(route);

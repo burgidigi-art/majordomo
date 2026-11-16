@@ -9,6 +9,8 @@ export interface StreamingBlock {
 
 interface Store {
   app: AppState | null;
+  /** Why the first load failed, shown instead of waiting forever. */
+  loadError: string;
   connected: boolean;
   /** Persisted transcript per agent ('pm' or a task id), loaded on demand. */
   events: Record<string, AgentEvent[]>;
@@ -40,6 +42,7 @@ function initialTheme(): 'dark' | 'light' {
 
 export const useStore = create<Store>((set, get) => ({
   app: null,
+  loadError: '',
   connected: false,
   events: {},
   loaded: {},
@@ -80,8 +83,14 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   async refresh() {
-    const app = await api.state();
-    set({ app });
+    try {
+      const app = await api.state();
+      set({ app, loadError: '' });
+    } catch (err) {
+      // Once the dashboard is showing, a failed refresh is retried on the next reconnect; before
+      // that, say what went wrong rather than leaving "Opening the desk…" up for good.
+      if (!get().app) set({ loadError: err instanceof Error ? err.message : String(err) });
+    }
   },
 }));
 
