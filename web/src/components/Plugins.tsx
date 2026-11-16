@@ -100,6 +100,37 @@ export function Plugins() {
 
   if (!list) return <div className="faint">Looking for plugins…</div>;
 
+  /**
+   * Open the plugin's sign-in page in a new window, then watch for the sign-in to land. The window is
+   * opened on the click itself, before the address is known, so the browser does not block it.
+   */
+  const signIn = async (p: PluginServer) => {
+    const win = window.open('about:blank', '_blank');
+    setBusy(p.id);
+    const res = await attempt(() => api.pluginSignIn(p.id));
+    if (!res) {
+      win?.close();
+      return setBusy('');
+    }
+    if (win) win.location.href = res.url;
+    else window.location.href = res.url;
+    toast(`Finish signing in to ${p.name} in the window that opened.`);
+    const until = Date.now() + 5 * 60_000;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const now = await api.plugins().catch(() => null);
+      const me = now?.plugins.find((x) => x.id === p.id);
+      if (now) setList(now.plugins);
+      if (me?.signedIn) {
+        setBusy('');
+        toast(`Signed in to ${p.name}.`);
+        return void test(me);
+      }
+      if (win?.closed && Date.now() > until - 4.5 * 60_000) break;
+    }
+    setBusy('');
+  };
+
   const test = async (p: PluginServer) => {
     setBusy(p.id);
     const res = await attempt(() => api.testPlugin(p.id));
@@ -146,7 +177,8 @@ export function Plugins() {
                   <span className="grow" style={{ minWidth: 0 }}>
                     <span className="plugin-title">
                       <span className="skill-name">{p.name}</span>
-                      <span className={`plugin-status ${st.tone}`}>{st.label}</span>
+                      <span className={`plugin-status ${p.canSignIn && !p.signedIn ? 'warn' : st.tone}`}>{p.canSignIn && !p.signedIn ? 'Needs sign-in' : st.label}</span>
+                      {p.signedIn && <span className="plugin-status ok">Signed in</span>}
                     </span>
                     <span className="skill-path mono" title={p.summary}>
                       {p.summary}
@@ -169,7 +201,24 @@ export function Plugins() {
                     )}
                   </span>
                   <span className="row" style={{ flex: 'none', gap: 6 }}>
-                    {p.status !== 'unsupported' && (
+                    {p.canSignIn && !p.signedIn && (
+                      <button className="btn primary sm" disabled={busy === p.id} onClick={() => void signIn(p)}>
+                        {busy === p.id ? 'Waiting for sign-in…' : 'Sign in'}
+                      </button>
+                    )}
+                    {p.signedIn && (
+                      <button
+                        className="btn ghost sm"
+                        title="Forget this sign-in"
+                        onClick={() => {
+                          if (confirm(`Sign out of ${p.name}? Your agents will not be able to use it until you sign in again.`))
+                            void attempt(() => api.pluginSignOut(p.id)).then((r) => r && setList(r.plugins));
+                        }}
+                      >
+                        Sign out
+                      </button>
+                    )}
+                    {p.status !== 'unsupported' && (!p.canSignIn || p.signedIn) && (
                       <button className="btn ghost sm" disabled={busy === p.id} onClick={() => void test(p)}>
                         {busy === p.id ? 'Starting…' : 'Test'}
                       </button>

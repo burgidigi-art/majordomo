@@ -21,7 +21,20 @@ export interface CallResult {
 }
 
 /** The server wants the user to sign in (OAuth) before it will talk. */
-export class NeedsSignIn extends Error {}
+export class NeedsSignIn extends Error {
+  constructor(
+    message: string,
+    /** The server's WWW-Authenticate header, which says where to sign in. */
+    readonly authenticate: string | null = null,
+  ) {
+    super(message);
+  }
+}
+
+export interface ClientOptions {
+  /** For a plugin the user signed in to: the token to send, renewed when `force` is set. */
+  token?: (force: boolean) => Promise<string | null>;
+}
 
 const PROTOCOL = '2025-06-18';
 const clientInfo = { name: 'majordomo', version: '1' };
@@ -54,7 +67,10 @@ export class McpClient {
   private stderr = '';
   private closed = false;
 
-  constructor(private readonly def: ServerDef) {}
+  constructor(
+    private readonly def: ServerDef,
+    private readonly opts: ClientOptions = {},
+  ) {}
 
   /** Connect and introduce ourselves. A slow first start (npx downloading a package) is allowed for. */
   async start(timeoutMs = 90_000): Promise<void> {
@@ -183,12 +199,14 @@ export class McpClient {
     else this.send(msg);
   }
 
-  private async post(def: Extract<ServerDef, { transport: 'http' }>, msg: object, timeoutMs: number): Promise<Response> {
+  private async post(def: Extract<ServerDef, { transport: 'http' }>, msg: object, timeoutMs: number, forceToken = false): Promise<Response> {
+    const token = this.opts.token ? await this.opts.token(forceToken) : null;
     try {
       return await fetch(def.url, {
         method: 'POST',
         headers: {
           ...def.headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'Content-Type': 'application/json',
           Accept: 'application/json, text/event-stream',
           'MCP-Protocol-Version': PROTOCOL,
@@ -208,10 +226,18 @@ export class McpClient {
   /** Streamable HTTP: POST the message; the answer comes back as JSON or as a short event stream. */
   private async httpRequest(msg: { id?: number; method: string }, timeoutMs: number): Promise<any> {
     const def = this.def as Extract<ServerDef, { transport: 'http' }>;
-    const res = await this.post(def, msg, timeoutMs);
+    let res = await this.post(def, msg, timeoutMs);
+    // A sign-in that has run out is renewed once before giving up on it.
+    if ((res.status === 401 || res.status === 403) && this.opts.token) {
+      void res.body?.cancel();
+      res = await this.post(def, msg, timeoutMs, true);
+    }
     const session = res.headers.get('mcp-session-id');
     if (session) this.session = session;
-    if (res.status === 401 || res.status === 403) throw new NeedsSignIn('This plugin needs you to sign in to it.');
+    if (res.status === 401 || res.status === 403) {
+      void res.body?.cancel();
+      throw new NeedsSignIn('This plugin needs you to sign in to it.', res.headers.get('www-authenticate'));
+    }
     if (msg.id === undefined) return null;
     if (!res.ok) throw new Error(`The plugin answered HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}.`);
     const type = res.headers.get('content-type') ?? '';

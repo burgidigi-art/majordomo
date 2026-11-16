@@ -11,7 +11,8 @@ import { z } from 'zod';
 import type { PluginServer, PluginSource } from '../shared/types.ts';
 import { parseToml, parseYaml } from './config-readers.ts';
 import { kvGet, kvSet } from './db.ts';
-import { McpClient, NeedsSignIn, type McpTool, type ServerDef } from './mcp-client.ts';
+import { McpClient, NeedsSignIn, type ClientOptions, type McpTool, type ServerDef } from './mcp-client.ts';
+import { pluginAccessToken, pluginSignedIn, signOutPlugin, startPluginSignIn } from './plugin-auth.ts';
 import { clip, defineTool, ToolError, type Tool } from './tools/tool.ts';
 
 interface Found {
@@ -282,14 +283,18 @@ const starting = new Map<string, Promise<Live>>();
 const problems = new Map<string, { state: 'error' | 'needs-sign-in'; message: string }>();
 const IDLE_MS = 10 * 60_000;
 
-let makeClient = (def: ServerDef) => new McpClient(def);
+let makeClient = (def: ServerDef, opts: ClientOptions) => new McpClient(def, opts);
 /** For tests: a stand-in for connecting to a server. */
-export function _setClientFactory(fn: ((def: ServerDef) => McpClient) | null): void {
-  makeClient = fn ?? ((def) => new McpClient(def));
+export function _setClientFactory(fn: ((def: ServerDef, opts: ClientOptions) => McpClient) | null): void {
+  makeClient = fn ?? ((def, opts) => new McpClient(def, opts));
 }
 
+/** A plugin at an address with no key of its own can be signed in to through the browser. */
+const canSignIn = (f: Found) => f.def?.transport === 'http' && !Object.keys(f.def.headers).some((h) => h.toLowerCase() === 'authorization');
+
 function cachedTools(id: string): { name: string; description: string }[] {
-  return kvGet<{ name: string; description: string }[]>(`plugins:tools:${id}`, []);
+  // Cleared (stored as null) when the user signs out.
+  return kvGet<{ name: string; description: string }[] | null>(`plugins:tools:${id}`, null) ?? [];
 }
 
 async function connect(f: Found): Promise<Live> {
@@ -302,7 +307,7 @@ async function connect(f: Found): Promise<Live> {
   if (pending) return pending;
   if (!f.def) throw new Error(f.unsupported ?? 'This plugin cannot be run.');
   const attempt = (async () => {
-    const client = makeClient(f.def!);
+    const client = makeClient(f.def!, canSignIn(f) ? { token: (force) => pluginAccessToken(f.id, force) } : {});
     try {
       await client.start();
       const tools = await client.listTools();
@@ -319,7 +324,11 @@ async function connect(f: Found): Promise<Live> {
       const message = err instanceof Error ? err.message : String(err);
       problems.set(f.id, err instanceof NeedsSignIn ? { state: 'needs-sign-in', message } : { state: 'error', message });
       throw err instanceof NeedsSignIn
-        ? new Error(`${f.name} needs you to sign in to it, which Majordomo cannot do yet. ${message}`)
+        ? new Error(
+            canSignIn(f)
+              ? `${f.name} needs the user to sign in to it: they can do that under Settings → Plugin tools, with the Sign in button.`
+              : `${f.name} refused the key it was given. Check its settings in ${f.sourceLabel}.`,
+          )
         : new Error(`${f.name} could not start: ${message}`);
     } finally {
       starting.delete(f.id);
@@ -342,6 +351,26 @@ export function closeAllPlugins(): void {
 setInterval(() => {
   for (const [id, entry] of live) if (Date.now() - entry.lastUsed > IDLE_MS) disconnect(id);
 }, 60_000).unref();
+
+/** Start a browser sign-in to a plugin; returns the page to open. */
+export async function signInToPlugin(id: string): Promise<string> {
+  const f = foundServers().find((x) => x.id === id);
+  if (!f || !canSignIn(f) || f.def?.transport !== 'http') throw new Error('This plugin does not sign in through the browser.');
+  return startPluginSignIn(f.id, f.name, f.def.url);
+}
+
+/** After signing in (or out), the next use connects afresh with the new sign-in. */
+export function afterSignIn(id: string): void {
+  disconnect(id);
+  problems.delete(id);
+}
+
+export function signOutOfPlugin(id: string): void {
+  signOutPlugin(id);
+  disconnect(id);
+  problems.delete(id);
+  kvSet(`plugins:tools:${id}`, null);
+}
 
 /** Connect now and report what it offers: the Test button in Settings. */
 export async function testPlugin(id: string): Promise<{ tools: { name: string; description: string }[] }> {
@@ -378,6 +407,8 @@ export function pluginList(force = false): PluginServer[] {
       error: problem?.message ?? f.unsupported ?? '',
       tools: (running?.tools.map((t) => ({ name: t.name, description: t.description })) ?? cachedTools(f.id)).slice(0, 200),
       removable: f.source === 'majordomo',
+      canSignIn: canSignIn(f),
+      signedIn: canSignIn(f) && pluginSignedIn(f.id),
     };
   });
 }

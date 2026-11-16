@@ -274,6 +274,9 @@ export interface PluginServer {
   tools: { name: string; description: string }[];
   /** Added by hand in Majordomo, so it can be removed here. */
   removable: boolean;
+  /** At an address with no key of its own: it can be signed in to through the browser. */
+  canSignIn: boolean;
+  signedIn: boolean;
 }
 
 /** How the user is told when something needs them. */

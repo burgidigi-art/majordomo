@@ -57,6 +57,8 @@ export const api = {
   setPlugins: (ids: string[], enabled: boolean) => request<{ plugins: PluginServer[] }>('/api/plugins', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
   addPlugin: (body: { name: string; command?: string; url?: string; headers?: Record<string, string> }) => post<{ plugins: PluginServer[] }>('/api/plugins', body),
   removePlugin: (id: string) => request<{ plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  pluginSignIn: (id: string) => post<{ url: string }>(`/api/plugins/${encodeURIComponent(id)}/sign-in`),
+  pluginSignOut: (id: string) => request<{ plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/sign-in`, { method: 'DELETE' }),
   testPlugin: (id: string) =>
     post<{ ok: boolean; error?: string; tools?: { name: string; description: string }[]; plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/test`),
   skills: (rescan = false) => request<SkillsPayload>(`/api/skills${rescan ? '?rescan=1' : ''}`),

@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { DATA_DIR } from './db.ts';
 import { setRedirectBase } from './google.ts';
+import { setPluginRedirectBase } from './plugin-auth.ts';
 import { app } from './http.ts';
 import { orch, runner, setBaseUrl } from './orchestrator.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -20,6 +21,7 @@ if (hostname !== '127.0.0.1' && hostname !== 'localhost' && !process.env.MAJORDO
 
 setBaseUrl(`http://127.0.0.1:${port}`);
 setRedirectBase(`http://127.0.0.1:${port}`);
+setPluginRedirectBase(`http://localhost:${port}`);
 
 // Listen first and boot second. Booting marks unfinished work as interrupted and starts the phone
 // gateway, which would disrupt a copy of Majordomo that is already running (the Mac app keeps one

@@ -81,6 +81,38 @@ export function setGoogleSecrets(next: GoogleSecrets | null): void {
   fs.chmodSync(SECRETS_FILE, 0o600);
 }
 
+/** A plugin's browser sign-in: the client Majordomo registered with its service, and the tokens it got. */
+export interface PluginAuth {
+  /** The plugin's address, so a sign-in is never reused for a different server under the same name. */
+  resource: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  clientId: string;
+  clientSecret?: string;
+  redirectUri: string;
+  scope?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  /** Milliseconds since the epoch; absent when the service did not say. */
+  expiresAt?: number;
+}
+
+export function getPluginAuth(id: string): PluginAuth | null {
+  const all = (readSecrets() as Record<string, any>).plugins ?? {};
+  const a = all[id];
+  return a && typeof a === 'object' && typeof a.clientId === 'string' ? (a as PluginAuth) : null;
+}
+
+export function setPluginAuth(id: string, next: PluginAuth | null): void {
+  const all = readSecrets() as Record<string, any>;
+  const plugins = { ...(all.plugins ?? {}) };
+  if (next) plugins[id] = next;
+  else delete plugins[id];
+  all.plugins = plugins;
+  fs.writeFileSync(SECRETS_FILE, JSON.stringify(all, null, 2), { mode: 0o600 });
+  fs.chmodSync(SECRETS_FILE, 0o600);
+}
+
 export function isKeyedRuntime(id: string): id is KeyedRuntime {
   return id in ENV_KEYS;
 }

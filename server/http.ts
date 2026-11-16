@@ -11,7 +11,8 @@ import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient,
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
-import { addOwnServer, pluginList, removeOwnServer, setPluginsEnabled, testPlugin } from './plugins.ts';
+import { finishPluginSignIn } from './plugin-auth.ts';
+import { addOwnServer, afterSignIn, pluginList, removeOwnServer, setPluginsEnabled, signInToPlugin, signOutOfPlugin, testPlugin } from './plugins.ts';
 import { addRepo, listRepos, listSkills, removeRepo, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
 import { speak } from './speech.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
@@ -419,6 +420,35 @@ app.post('/api/plugins', async (c) => {
 app.delete('/api/plugins/:id', (c) => {
   removeOwnServer(c.req.param('id'));
   return c.json({ plugins: pluginList(true) });
+});
+
+app.post('/api/plugins/:id/sign-in', async (c) => c.json({ url: await signInToPlugin(c.req.param('id')) }));
+
+app.delete('/api/plugins/:id/sign-in', (c) => {
+  signOutOfPlugin(c.req.param('id'));
+  return c.json({ plugins: pluginList() });
+});
+
+/** Where the browser comes back after signing in to a plugin. */
+app.get('/api/plugins/oauth/callback', async (c) => {
+  const escape = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+  const page = (title: string, body: string, ok: boolean) =>
+    c.html(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title>` +
+        '<style>body{font:16px/1.5 -apple-system,system-ui,sans-serif;background:#0b0b0f;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px}' +
+        'main{max-width:420px;text-align:center}h1{font-size:22px;margin:0 0 8px}p{color:#aaa}a{color:#f3b65f}</style>' +
+        `<main><h1>${ok ? '✓ ' : ''}${escape(title)}</h1><p>${escape(body)}</p><p><a href="/#/settings/plugins">Back to Majordomo</a></p></main>` +
+        (ok ? '<script>setTimeout(()=>window.close(),1500)</script>' : ''),
+      ok ? 200 : 400,
+    );
+  try {
+    const q = c.req.query();
+    const done = await finishPluginSignIn({ code: q.code, state: q.state, error: q.error, error_description: q.error_description });
+    afterSignIn(done.id);
+    return page(`Signed in to ${done.name}`, 'Your agents can use it now. You can close this tab.', true);
+  } catch (err) {
+    return page('Sign-in did not finish', describeError(err), false);
+  }
 });
 
 app.post('/api/plugins/:id/test', async (c) => {
