@@ -5,6 +5,7 @@ import { api } from '../api.ts';
 import { browserVoices, say, setVoicePrefs, stopSpeaking, useSpeaker, type VoicePrefs } from '../speaker.ts';
 import { useStore } from '../store.ts';
 import { pickVoice } from '../voice.ts';
+import { Plugins } from './Plugins.tsx';
 import { Skills } from './Skills.tsx';
 import { attempt, Avatar, toast } from './ui.tsx';
 
@@ -792,6 +793,16 @@ export function Settings({ section }: { section?: string }) {
             Code, Codex or Hermes are found on their own.
           </p>
           <Skills />
+        </section>
+
+        <section className="section" id="plugins">
+          <h2>Plugin tools</h2>
+          <p>
+            Plugins connect your agents to your other apps and services: Notion, GitHub, a database, a design tool. Majordomo runs them
+            itself, so every agent on the crew can use them, on any account. Agents look a plugin’s tools up when a task needs them. With
+            commands set to “Ask me first”, anything a plugin does that is not read-only waits for your approval, like a shell command.
+          </p>
+          <Plugins />
         </section>
 
         <section className="section" id="google">

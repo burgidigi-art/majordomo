@@ -290,6 +290,15 @@ files you send in, and one workspace folder per project. A project can instead p
   manager can name one in a brief. Claude Code agents also use their own skills and plugins directly. Skills already on
   your computer start switched on; skills from a repository start **off**, because they are instructions written by
   someone else. Your own skill folders can go in `~/.majordomo/skills/own`.
+- **Plugin tools** — Settings → Plugin tools (also in the sidebar). Plugins (MCP servers) connect agents to your other
+  apps: Notion, GitHub, a database, a design tool. Majordomo finds the ones already set up in Claude Code (its own
+  settings and installed plugins), Claude Desktop, Codex and Hermes, and you can add more: a command that starts one, or
+  its https address. Majordomo runs them itself, starting each the first time it is needed and stopping it after ten
+  idle minutes, so every agent on the crew can use them on any account through two tools, `plugin_tools` (what is
+  there and what each tool takes) and `use_plugin_tool`. Each task's brief names the plugins switched on. With commands
+  set to *Ask me first*, a plugin action that the plugin does not mark read-only waits for your Allow or Decline, like
+  a shell command. **Test** starts one and lists its tools. Not yet supported: plugins that need you to sign in
+  through a browser (OAuth), and the older SSE connection type.
 - **Chat** — talk to the manager; the crew panel shows who is working, on what, for how long, and anything waiting
   on you.
 - **Any agent** — click it for the full transcript, streaming live: its brief, every command, file and result. Type

@@ -8,6 +8,7 @@ import { googleConnected, googleStatus } from './google.ts';
 import { getLimits } from './limits.ts';
 import { googleTools } from './tools/google.ts';
 import { alerts } from './alerts.ts';
+import { enabledPluginNames, pluginCatalog, pluginTools } from './plugins.ts';
 import { enabledSkillNames, skillCatalog, skillFolders } from './skills.ts';
 import { speechStatus } from './speech.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -106,6 +107,12 @@ function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): s
         `Skills the crew can use (each agent is told about them and reads the instructions when a task fits; name one in a brief when it clearly applies): ${shown.join(', ')}${skillNames.length > shown.length ? `, and ${skillNames.length - shown.length} more` : ''}`,
       );
     }
+    const pluginNames = enabledPluginNames();
+    if (pluginNames.length) {
+      lines.push(
+        `Plugin tools the crew can use (they connect to the user's other apps; agents look up and run them themselves): ${pluginNames.join(', ')}`,
+      );
+    }
     const mem = memory.all().slice(-80);
     if (mem.length) lines.push('Memory:', ...mem.map((m) => `- ${m.id}: ${m.text}`));
     const google = googleStatus();
@@ -199,7 +206,8 @@ function firstMessage(t: Task): InboxItem {
     .filter((d): d is Task => !!d && !!d.result)
     .map((d) => `## ${d.id}: ${d.title}\n${clip(d.result, 8000)}`);
   const skills = skillCatalog({ nativeClaude: t.runtime === 'claude-code' });
-  const text = `Task ${t.id}: ${t.title}\n\n${t.brief}${deps.length ? `\n\n# Reports from the tasks this one depends on\n\n${deps.join('\n\n')}` : ''}${noteText}${skills ? `\n\n${skills}` : ''}`;
+  const plugins = pluginCatalog();
+  const text = `Task ${t.id}: ${t.title}\n\n${t.brief}${deps.length ? `\n\n# Reports from the tasks this one depends on\n\n${deps.join('\n\n')}` : ''}${noteText}${skills ? `\n\n${skills}` : ''}${plugins ? `\n\n${plugins}` : ''}`;
   return { from: 'manager', text };
 }
 
@@ -237,7 +245,7 @@ export function tick(): void {
 
 // ---------- runner wiring ----------
 
-const host: Host = {
+export const agentHost: Host = {
   progress(agentId, note) {
     patchTask(agentId, { statusLine: note });
   },
@@ -379,9 +387,12 @@ function specFor(id: string): AgentSpec {
     effort: t.effort,
     cwd: project.workspace,
     system: workerSystem({ crewName: t.crewName, cwd: project.workspace, helper: !!t.parentId }),
-    tools: [...workerTools({ canDelegate: !t.parentId }), ...googleTools()],
-    // Agents on a CLI account bring their own tools; email and calendar reach them over MCP.
-    mcp: runtimeDef(t.runtime).kind === 'cli' && googleConnected() ? { url: `${baseUrl}/mcp/google`, token: MCP_TOKEN } : undefined,
+    tools: [...workerTools({ canDelegate: !t.parentId }), ...googleTools(), ...(enabledPluginNames().length ? pluginTools() : [])],
+    // Agents on a CLI account bring their own tools; email, calendar and plugin tools reach them over MCP.
+    mcp:
+      runtimeDef(t.runtime).kind === 'cli' && (googleConnected() || enabledPluginNames().length)
+        ? { url: `${baseUrl}/mcp/worker/${encodeURIComponent(t.id)}`, token: MCP_TOKEN }
+        : undefined,
     cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace }),
     readDirs: skillFolders(),
   };
@@ -482,7 +493,7 @@ function statusText(): string {
   return lines.join('\n');
 }
 
-export const runner = new Runner({ spec: specFor, host, onStart, onFinish, onUsage, onReply });
+export const runner = new Runner({ spec: specFor, host: agentHost, onStart, onFinish, onUsage, onReply });
 
 // ---------- the orchestrator API (used by PM tools and the HTTP layer) ----------
 

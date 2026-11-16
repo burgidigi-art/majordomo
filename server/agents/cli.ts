@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import type { Effort, RuntimeId } from '../../shared/types.ts';
 import { emit, emitDelta } from '../bus.ts';
+import { DATA_DIR } from '../db.ts';
 import { recordClaudeLimits } from '../limits.ts';
 import { EMPTY_USAGE, type Usage } from '../llm/types.ts';
 import { cliBinary, getSettings } from '../settings.ts';
@@ -98,8 +99,9 @@ const claude: Driver = {
         },
       };
       args.push('--mcp-config', JSON.stringify(config));
-      // The manager works only through the harness. A worker keeps whatever else the user has set up.
-      if (turn.manager) args.push('--strict-mcp-config');
+      // Only the harness's servers: plugins the user set up for Claude Code reach a worker through
+      // Majordomo's plugin tools, where they are switched on and off and their actions approved.
+      args.push('--strict-mcp-config');
     }
     return { args, stdin: turn.prompt };
   },
@@ -291,10 +293,24 @@ const gemini: Driver = {
       );
       args.push('--allowed-mcp-server-names', 'majordomo');
     }
+    const env: Record<string, string> = {};
+    if (turn.mcp && !turn.manager) {
+      // A worker's connection to Majordomo goes in a settings file of Majordomo's own, pointed to by an
+      // environment variable, rather than into the project's folder where the token would sit in the work.
+      const file = path.join(DATA_DIR, 'gemini', `${turn.agentId.replace(/[^\w.-]/g, '_')}.json`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        JSON.stringify({ mcpServers: { majordomo: { httpUrl: turn.mcp.url, headers: { Authorization: `Bearer ${turn.mcp.token}` }, trust: true } } }, null, 2),
+        { mode: 0o600 },
+      );
+      env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = file;
+      args.push('--allowed-mcp-server-names', 'majordomo');
+    }
     const prompt = turn.system && !turn.session ? `${turn.system}\n\n---\n\n${turn.prompt}` : turn.prompt;
     // -p switches the CLI to headless mode; the prompt itself goes in on stdin, which has no length limit.
     args.push('-p', 'Carry out the request above.');
-    return { args, stdin: prompt, session };
+    return { args, stdin: prompt, session, env };
   },
   onLine(line, s) {
     const id = s.turn.agentId;
@@ -344,9 +360,15 @@ const DRIVERS: Partial<Record<RuntimeId, Driver>> = { 'claude-code': claude, cod
 
 /** The command-line arguments a turn would run with, for tests. */
 export function cliArgs(turn: CliTurn): string[] {
+  return cliCommand(turn).args;
+}
+
+/** The arguments and extra environment a turn would run with, for tests. */
+export function cliCommand(turn: CliTurn): { args: string[]; env: Record<string, string> } {
   const driver = DRIVERS[turn.runtime];
   if (!driver) throw new Error(`No CLI driver for ${turn.runtime}`);
-  return driver.args(turn).args;
+  const built = driver.args(turn);
+  return { args: built.args, env: built.env ?? {} };
 }
 
 export function runCliTurn(turn: CliTurn): Promise<CliResult> {

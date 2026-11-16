@@ -256,6 +256,26 @@ export interface SkillRepo {
   enabled: number;
 }
 
+export type PluginSource = 'majordomo' | 'claude' | 'claude-plugin' | 'claude-desktop' | 'codex' | 'hermes';
+
+/** A plugin (an MCP server) whose tools the crew can use. */
+export interface PluginServer {
+  id: string;
+  /** The short name agents use for it. */
+  key: string;
+  name: string;
+  source: PluginSource;
+  sourceLabel: string;
+  enabled: boolean;
+  /** What it runs or where it connects, with secrets shortened. */
+  summary: string;
+  status: 'idle' | 'running' | 'error' | 'needs-sign-in' | 'unsupported';
+  error: string;
+  tools: { name: string; description: string }[];
+  /** Added by hand in Majordomo, so it can be removed here. */
+  removable: boolean;
+}
+
 /** How the user is told when something needs them. */
 export interface AlertSettings {
   /** Notifications are posted through macOS, so only offered there. */

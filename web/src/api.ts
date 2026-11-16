@@ -1,4 +1,4 @@
-import type { AgentEvent, AlertSettings, AppState, Skill, SkillRepo, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { AgentEvent, AlertSettings, AppState, PluginServer, Skill, SkillRepo, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -53,6 +53,12 @@ export const api = {
   test: (runtime: RuntimeId) => post<{ ok: boolean; message: string }>(`/api/runtimes/${runtime}/test`),
   adopt: (runtime: RuntimeId, model: string) => post('/api/setup/adopt', { runtime, model }),
 
+  plugins: (rescan = false) => request<{ plugins: PluginServer[] }>(`/api/plugins${rescan ? '?rescan=1' : ''}`),
+  setPlugins: (ids: string[], enabled: boolean) => request<{ plugins: PluginServer[] }>('/api/plugins', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
+  addPlugin: (body: { name: string; command?: string; url?: string; headers?: Record<string, string> }) => post<{ plugins: PluginServer[] }>('/api/plugins', body),
+  removePlugin: (id: string) => request<{ plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  testPlugin: (id: string) =>
+    post<{ ok: boolean; error?: string; tools?: { name: string; description: string }[]; plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/test`),
   skills: (rescan = false) => request<SkillsPayload>(`/api/skills${rescan ? '?rescan=1' : ''}`),
   setSkills: (ids: string[], enabled: boolean) => request<SkillsPayload>('/api/skills', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
   addSkillRepo: (url: string) => post<SkillsPayload>('/api/skills/repos', { url }),

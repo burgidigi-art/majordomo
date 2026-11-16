@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   PanelRight,
   Settings as SettingsIcon,
+  Plug,
   Smartphone,
   Sparkles,
   Square,
@@ -152,6 +153,7 @@ export function App() {
         <div className="nav">
           <NavLink href="#/settings/crew" icon={Users} label="Crew" active={section === 'settings' && settingsPart === 'crew'} count={String(app.settings.crew.length)} />
           <NavLink href="#/settings/skills" icon={Sparkles} label="Skills" active={section === 'settings' && settingsPart === 'skills'} />
+          <NavLink href="#/settings/plugins" icon={Plug} label="Plugins" active={section === 'settings' && settingsPart === 'plugins'} />
           <NavLink href="#/settings/accounts" icon={KeyRound} label="Accounts" active={section === 'settings' && settingsPart === 'accounts'} />
           <NavLink
             href="#/settings/phone"

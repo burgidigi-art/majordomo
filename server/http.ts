@@ -11,6 +11,7 @@ import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient,
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
+import { addOwnServer, pluginList, removeOwnServer, setPluginsEnabled, testPlugin } from './plugins.ts';
 import { addRepo, listRepos, listSkills, removeRepo, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
 import { speak } from './speech.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
@@ -38,7 +39,8 @@ export const app = new Hono();
 
 app.use('*', async (c, next) => {
   const url = new URL(c.req.url);
-  if (url.pathname === '/mcp' || url.pathname === '/mcp/google') return next();
+  // The MCP endpoints check their own token; CLI agents call them without a browser origin.
+  if (url.pathname === '/mcp' || url.pathname === '/mcp/google' || url.pathname.startsWith('/mcp/worker/')) return next();
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
@@ -397,6 +399,37 @@ app.delete('/api/skills/repos/:id', (c) => {
   return c.json(skillsPayload(true));
 });
 
+// ---------- plugin tools ----------
+
+app.get('/api/plugins', (c) => c.json({ plugins: pluginList(c.req.query('rescan') === '1') }));
+
+app.put('/api/plugins', async (c) => {
+  const body = await c.req.json<{ ids?: string[]; enabled?: boolean }>();
+  if (!Array.isArray(body.ids) || typeof body.enabled !== 'boolean') return c.json({ error: 'Send ids and enabled.' }, 400);
+  const known = new Set(pluginList().map((p) => p.id));
+  setPluginsEnabled(body.ids.filter((id) => known.has(id)), body.enabled);
+  return c.json({ plugins: pluginList() });
+});
+
+app.post('/api/plugins', async (c) => {
+  addOwnServer(await c.req.json());
+  return c.json({ plugins: pluginList(true) });
+});
+
+app.delete('/api/plugins/:id', (c) => {
+  removeOwnServer(c.req.param('id'));
+  return c.json({ plugins: pluginList(true) });
+});
+
+app.post('/api/plugins/:id/test', async (c) => {
+  try {
+    const result = await testPlugin(c.req.param('id'));
+    return c.json({ ok: true, tools: result.tools, plugins: pluginList() });
+  } catch (err) {
+    return c.json({ ok: false, error: describeError(err), plugins: pluginList() });
+  }
+});
+
 // ---------- voice mode ----------
 
 /** A reply read aloud with OpenAI's voices. Without an OpenAI key the dashboard uses the computer's own. */
@@ -468,6 +501,7 @@ app.delete('/api/google', async (c) => {
 
 app.all('/mcp', mcpEndpoint);
 app.all('/mcp/google', mcpEndpoint);
+app.all('/mcp/worker/:id', mcpEndpoint);
 
 // ---------- the built dashboard ----------
 

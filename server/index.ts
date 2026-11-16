@@ -4,6 +4,7 @@ import { setRedirectBase } from './google.ts';
 import { app } from './http.ts';
 import { orch, runner, setBaseUrl } from './orchestrator.ts';
 import { telegram } from './gateways/telegram.ts';
+import { closeAllPlugins } from './plugins.ts';
 import { DEMO, getSettings } from './settings.ts';
 
 const port = Number(process.env.MAJORDOMO_PORT || process.env.PORT || 4317);
@@ -50,6 +51,7 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     console.log('\n  Stopping agents…');
     runner.stopAll();
     telegram.stop();
+    closeAllPlugins();
     setTimeout(() => process.exit(0), 400);
   });
 }

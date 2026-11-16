@@ -1,6 +1,9 @@
 import type { Context } from 'hono';
 import { describeError } from './llm/index.ts';
-import { MCP_TOKEN, orch, VERSION } from './orchestrator.ts';
+import { projects, tasks } from './db.ts';
+import { googleConnected } from './google.ts';
+import { agentHost, MCP_TOKEN, orch, VERSION } from './orchestrator.ts';
+import { enabledPluginNames, pluginTools } from './plugins.ts';
 import { googleTools } from './tools/google.ts';
 import { pmTools } from './tools/pm.ts';
 import { ToolError, toolDef, type Host, type Tool } from './tools/tool.ts';
@@ -21,7 +24,15 @@ const noHost: Host = {
 /** Everything the manager can use over MCP. web_fetch is left out: every CLI already has its own. */
 const managerTools = (): Tool[] => [...pmTools(orch).filter((t) => t.name !== 'web_fetch'), ...googleTools()];
 
-async function handle(msg: any, tools: Tool[]): Promise<object | null> {
+interface Caller {
+  agentId: string;
+  cwd: string;
+  host: Host;
+}
+
+const managerCaller: Caller = { agentId: 'pm', cwd: process.cwd(), host: noHost };
+
+async function handle(msg: any, tools: Tool[], caller: Caller = managerCaller): Promise<object | null> {
   const reply = (result: unknown) => ({ jsonrpc: '2.0', id: msg.id, result });
   const fail = (code: number, message: string) => ({ jsonrpc: '2.0', id: msg.id, error: { code, message } });
   // Notifications carry no id and get no response.
@@ -47,7 +58,7 @@ async function handle(msg: any, tools: Tool[]): Promise<object | null> {
         return text(`Invalid input — ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, true);
       }
       try {
-        const out = await tool.run(parsed.data, { agentId: 'pm', cwd: process.cwd(), signal: new AbortController().signal, host: noHost });
+        const out = await tool.run(parsed.data, { agentId: caller.agentId, cwd: caller.cwd, signal: new AbortController().signal, host: caller.host });
         return text(typeof out === 'string' ? out : out.text);
       } catch (err) {
         return text(err instanceof ToolError ? err.message : describeError(err), true);
@@ -58,11 +69,39 @@ async function handle(msg: any, tools: Tool[]): Promise<object | null> {
   }
 }
 
-/** `/mcp` serves the manager; `/mcp/google` serves worker agents the email and calendar tools only. */
+/**
+ * The tools a worker on a CLI account gets from Majordomo: email and calendar when connected, and the
+ * plugin tools. Calls run as that task, so approvals show which agent is asking.
+ */
+function workerEndpointFor(agentId: string): { tools: Tool[]; caller: Caller } | null {
+  const t = tasks.get(agentId);
+  if (!t) return null;
+  const cwd = projects.get(t.projectId)?.workspace ?? process.cwd();
+  return {
+    tools: [...(googleConnected() ? googleTools() : []), ...(enabledPluginNames().length ? pluginTools() : [])],
+    caller: { agentId, cwd, host: agentHost },
+  };
+}
+
+/**
+ * `/mcp` serves the manager; `/mcp/google` serves worker agents the email and calendar tools only;
+ * `/mcp/worker/<task>` serves one worker its email, calendar and plugin tools.
+ */
 export async function mcpEndpoint(c: Context): Promise<Response> {
   if (c.req.header('authorization') !== `Bearer ${MCP_TOKEN}`) return c.json({ error: 'unauthorized' }, 401);
   if (c.req.method !== 'POST') return c.body(null, 405, { Allow: 'POST' });
-  const tools = new URL(c.req.url).pathname === '/mcp/google' ? googleTools() : managerTools();
+  const pathname = new URL(c.req.url).pathname;
+  let caller = managerCaller;
+  let tools: Tool[];
+  const worker = /^\/mcp\/worker\/([^/]+)$/.exec(pathname);
+  if (worker) {
+    const found = workerEndpointFor(decodeURIComponent(worker[1]!));
+    if (!found) return c.json({ error: 'unknown agent' }, 404);
+    tools = found.tools;
+    caller = found.caller;
+  } else {
+    tools = pathname === '/mcp/google' ? googleTools() : managerTools();
+  }
   let body: any;
   try {
     body = await c.req.json();
@@ -70,9 +109,9 @@ export async function mcpEndpoint(c: Context): Promise<Response> {
     return c.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, 400);
   }
   if (Array.isArray(body)) {
-    const out = (await Promise.all(body.map((m) => handle(m, tools)))).filter(Boolean);
+    const out = (await Promise.all(body.map((m) => handle(m, tools, caller)))).filter(Boolean);
     return out.length ? c.json(out) : c.body(null, 202);
   }
-  const out = await handle(body, tools);
+  const out = await handle(body, tools, caller);
   return out ? c.json(out) : c.body(null, 202);
 }

@@ -2509,6 +2509,59 @@ a:hover {
   text-overflow: ellipsis;
 }
 
+.plugin-row {
+  cursor: default;
+}
+.plugin-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.plugin-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+.plugin-status.ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.plugin-status.bad {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+}
+.plugin-status.warn {
+  color: var(--attn);
+  background: var(--attn-soft);
+}
+.plugin-error {
+  display: block;
+  font-size: 12px;
+  color: var(--bad);
+  margin-top: 3px;
+}
+.plugin-tools-toggle {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.plugin-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.plugin-tool b {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .list-row {
   display: flex;
   align-items: flex-start;
