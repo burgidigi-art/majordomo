@@ -257,9 +257,12 @@ a:hover {
   flex: none;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(145deg, var(--brand-2), var(--brand));
-  box-shadow: 0 8px 20px -8px var(--brand), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  filter: drop-shadow(0 6px 12px color-mix(in srgb, var(--brand) 45%, transparent));
+}
+.brand-mark img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 .brand-name {
   font-size: 18px;

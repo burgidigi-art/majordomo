@@ -1,6 +1,5 @@
 import {
   Activity as ActivityIcon,
-  BellRing,
   Brain,
   FolderKanban,
   KeyRound,
@@ -135,7 +134,7 @@ export function App() {
       <nav className="sidebar" aria-label="Main">
         <a href="#/" className="brand">
           <span className="brand-mark">
-            <BellRing size={17} />
+            <img src="/favicon.svg" alt="" width="34" height="34" />
           </span>
           <span className="brand-text">
             <div className="brand-name">Chiba</div>

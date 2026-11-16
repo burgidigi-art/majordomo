@@ -350,6 +350,10 @@ Agents run commands on your computer. Know what the guard rails are and are not:
 
 ## Development
 
+The icon (a cartoon karate gi with a black belt) is drawn in code in `web/src/brand.ts`. After changing it, run
+`npx tsx scripts/make-icon.mts` (it needs Playwright) to regenerate the Mac app icon `assets/Chiba.icns`, the browser
+tab icon `web/public/favicon.svg` and `assets/icon.svg`.
+
 ```bash
 npm run dev
 ```
