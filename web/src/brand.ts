@@ -1,9 +1,11 @@
 // Chiba's mark: a cartoon mid-shot of a karate gi, from the knees to the neck, tied with a black belt.
-// One drawing serves the Mac app icon, the browser tab icon and the logo in the dashboard. Two
-// versions: hands gripping near the ends of the belt, or no hands (arms hanging out of frame).
+// One drawing serves the Mac app icon, the browser tab icon and the logo in the dashboard. Two poses:
+// grip (hands holding the belt near its ends) or sides (arms hanging, hands just below the belt).
+
+export type Pose = 'grip' | 'sides';
 
 export interface MarkOptions {
-  hands: boolean;
+  pose: Pose;
   /** Draw the orange tile behind it (app icon, favicon). Without it, the figure alone. */
   tile: boolean;
   /** Unique prefix for ids, so several marks can share a page. */
@@ -43,14 +45,35 @@ function fist(x: number, y: number, flip: boolean): string {
     </g>`;
 }
 
+/** A relaxed fist hanging at the side, knuckles facing out, fingers curled towards the body. */
+function hangingFist(x: number, y: number, flip: boolean): string {
+  const t = flip ? `translate(${x} ${y}) scale(-1 1)` : `translate(${x} ${y})`;
+  return `<g transform="${t}">
+      ${outlined('M-15 -6 Q -15 -16 -5 -16 L 7 -16 Q 17 -16 17 -6 L 17 12 Q 17 22 7 22 L -5 22 Q -15 22 -15 12 Z', SKIN)}
+      ${fold('M17 -2 h-7 M17 6 h-8 M17 14 h-6')}
+      ${fold('M-6 -14 Q -2 -4 -8 6')}
+      <path d="M-11 18 Q 0 21 11 18" fill="none" stroke="${SKIN_SHADOW}" stroke-width="3" stroke-linecap="round"/>
+    </g>`;
+}
+
+/** An arm hanging straight down the side, its sleeve ending in a cuff just below the belt. */
+function hangingArm(x: number, flip: boolean): string {
+  const lean = flip ? -2 : 2;
+  return `${hangingFist(x + lean, 194, flip)}
+    ${sleeve(`M ${x - lean} -14 C ${x - lean} 60, ${x} 130, ${x + lean} 180`, `M ${x + (flip ? -10 : 10)} 30 C ${x + (flip ? -10 : 10)} 90, ${x + (flip ? -10 : 10)} 140, ${x + (flip ? -9 : 9)} 168`)}
+    <path d="M ${x + lean - 27} 180 H ${x + lean + 27}" stroke="${INK}" stroke-width="${LINE}" stroke-linecap="round"/>
+    <path d="M ${x + lean - 20} 172 H ${x + lean + 20}" stroke="${INK}" stroke-width="${FOLD}" stroke-linecap="round" opacity="0.6"/>`;
+}
+
 /** The figure on a 256 × 256 grid: neck at the top edge, knees at the bottom. */
-function figure(hands: boolean): string {
-  const arms = hands
-    ? sleeve('M 0 -14 C 0 70, 4 140, 28 176 S 58 202, 74 207', 'M 14 24 C 14 92, 18 140, 34 166') +
-      sleeve('M 256 -14 C 256 70, 252 140, 228 176 S 198 202, 182 207', 'M 242 24 C 242 92, 238 140, 222 166')
-    : sleeve('M 12 -14 C 10 80, 10 180, 8 276', 'M 23 34 C 22 112, 22 190, 21 250') +
-      sleeve('M 244 -14 C 246 80, 246 180, 248 276', 'M 233 34 C 234 112, 234 190, 235 250');
-  const fists = hands ? fist(92, 214, false) + fist(166, 217, true) : '';
+function figure(pose: Pose): string {
+  const arms =
+    pose === 'grip'
+      ? sleeve('M 0 -14 C 0 70, 4 140, 28 176 S 58 202, 74 207', 'M 14 24 C 14 92, 18 140, 34 166') +
+        sleeve('M 256 -14 C 256 70, 252 140, 228 176 S 198 202, 182 207', 'M 242 24 C 242 92, 238 140, 222 166') +
+        fist(92, 214, false) +
+        fist(166, 217, true)
+      : hangingArm(16, false) + hangingArm(240, true);
 
   return `
     <!-- trousers, to the knees -->
@@ -78,12 +101,11 @@ function figure(hands: boolean): string {
     <path d="M108 164 L 92 228 M148 164 L 167 230" stroke="${BELT_SHINE}" stroke-width="2.5" stroke-linecap="round"/>
     ${outlined('M110 133 Q 128 123 146 133 L 148 165 Q 128 175 108 165 Z', BELT)}
     <path d="M113 141 Q 128 153 143 141 M113 158 Q 128 146 143 158" fill="none" stroke="${BELT_SHINE}" stroke-width="2.5" stroke-linecap="round"/>
-    ${arms}
-    ${fists}`;
+    ${arms}`;
 }
 
 /** The mark as an SVG document. */
-export function markSvg({ hands, tile, id = 'chiba' }: MarkOptions): string {
+export function markSvg({ pose, tile, id = 'chiba' }: MarkOptions): string {
   const p = `${id}-`;
   const box = tile ? { x: 100, size: 824, rx: 186 } : { x: 0, size: 1024, rx: 230 };
   const scale = box.size / 256;
@@ -94,7 +116,7 @@ export function markSvg({ hands, tile, id = 'chiba' }: MarkOptions): string {
   </defs>
   ${tile ? `<rect x="${box.x}" y="${box.x}" width="${box.size}" height="${box.size}" rx="${box.rx}" fill="url(#${p}tile)"/>` : ''}
   <g clip-path="url(#${p}clip)">
-    <g transform="translate(${box.x} ${box.x}) scale(${scale}) translate(${256 * 0.07} 0) scale(0.86 1)">${figure(hands)}</g>
+    <g transform="translate(${box.x} ${box.x}) scale(${scale}) translate(${256 * 0.07} 0) scale(0.86 1)">${figure(pose)}</g>
   </g>
   ${tile ? `<rect x="${box.x + 6}" y="${box.x + 6}" width="${box.size - 12}" height="${box.size - 12}" rx="${box.rx - 6}" fill="none" stroke="${INK}" stroke-width="14" opacity="0.9"/>` : ''}
 </svg>`;
