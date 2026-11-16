@@ -153,17 +153,59 @@ function apply(msg: StreamMessage): void {
   }
 }
 
-let source: EventSource | null = null;
+let started = false;
 
+/** What one window passes to the others: a stream message, or whether the stream is up. */
+type Relay = { msg: StreamMessage } | { connected: boolean };
+
+/**
+ * Live updates. A browser keeps at most six connections open to one address, and each open stream
+ * holds one for good, so with a handful of Majordomo windows open the next one could never load. So
+ * only one window holds the stream (whichever holds the lock) and relays what it receives to the
+ * others; when it closes, another takes over. Browsers without locks fall back to a stream per window.
+ */
 export function connect(): void {
-  if (source) return;
-  source = new EventSource('/api/stream');
-  source.onmessage = (ev) => {
-    try {
-      apply(JSON.parse(ev.data) as StreamMessage);
-    } catch {
-      /* ignore a malformed frame */
-    }
+  if (started) return;
+  started = true;
+  const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('majordomo-stream') : null;
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+
+  const openStream = (relay: (r: Relay) => void) => {
+    const source = new EventSource('/api/stream');
+    source.onmessage = (ev) => {
+      let msg: StreamMessage;
+      try {
+        msg = JSON.parse(ev.data) as StreamMessage;
+      } catch {
+        return; // a malformed frame
+      }
+      apply(msg);
+      relay({ msg });
+    };
+    source.onerror = () => {
+      useStore.setState({ connected: false });
+      relay({ connected: false });
+    };
   };
-  source.onerror = () => useStore.setState({ connected: false });
+
+  if (!channel || !locks) {
+    openStream(() => {});
+    return;
+  }
+
+  // Until this window holds the stream itself, it follows the one that does.
+  channel.onmessage = (ev: MessageEvent<Relay>) => {
+    const r = ev.data;
+    if ('msg' in r) apply(r.msg);
+    else useStore.setState({ connected: r.connected });
+  };
+  useStore.setState({ connected: true });
+
+  void locks.request('majordomo-stream', () => {
+    // This window leads now: it stops listening to the channel and talks on it instead. The lock is
+    // held until the window closes, which hands it to the next one.
+    channel.onmessage = null;
+    openStream((r) => channel.postMessage(r));
+    return new Promise<never>(() => {});
+  });
 }
