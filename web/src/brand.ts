@@ -45,9 +45,10 @@ function fist(x: number, y: number, flip: boolean): string {
     </g>`;
 }
 
-/** A relaxed fist hanging at the side, knuckles facing out, fingers curled towards the body. */
+/** A relaxed fist hanging at the side, drawn then turned half a circle so the thumb and knuckles sit naturally. */
 function hangingFist(x: number, y: number, flip: boolean): string {
-  const t = flip ? `translate(${x} ${y}) scale(-1 1)` : `translate(${x} ${y})`;
+  // Turned about the fist's own centre (1, 3), so it stays where it hangs under the cuff.
+  const t = `${flip ? `translate(${x} ${y}) scale(-1 1)` : `translate(${x} ${y})`} rotate(180 1 3)`;
   return `<g transform="${t}">
       ${outlined('M-15 -6 Q -15 -16 -5 -16 L 7 -16 Q 17 -16 17 -6 L 17 12 Q 17 22 7 22 L -5 22 Q -15 22 -15 12 Z', SKIN)}
       ${fold('M17 -2 h-7 M17 6 h-8 M17 14 h-6')}
