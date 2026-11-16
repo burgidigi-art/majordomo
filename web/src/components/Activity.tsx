@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Task } from '../../../shared/types.ts';
 import { clock, compact, duration, isLive, isOpen, isTrouble, money, taskElapsed, useNow } from '../lib.ts';
 import { useStore } from '../store.ts';
+import { ModelUsage } from './ModelUsage.tsx';
 import { Avatar, Empty, StatusPill, TaskAvatar } from './ui.tsx';
 
 function Timeline({ tasks, now }: { tasks: Task[]; now: number }) {
@@ -88,6 +89,8 @@ export function Activity() {
             <p className="page-sub">Every agent your manager has put to work, across all projects. Click any row to read its full transcript.</p>
           </div>
         </div>
+
+        <ModelUsage />
 
         {app.tasks.length === 0 ? (
           <Empty title="Nothing has run yet">Agents appear here as soon as your manager assigns work.</Empty>

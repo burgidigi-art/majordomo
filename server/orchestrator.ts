@@ -11,6 +11,7 @@ import { alerts } from './alerts.ts';
 import { enabledPluginNames, pluginCatalog, pluginTools } from './plugins.ts';
 import { enabledSkillNames, skillCatalog, skillFolders } from './skills.ts';
 import { speechStatus } from './speech.ts';
+import { usageSummary } from './usage.ts';
 import { telegram } from './gateways/telegram.ts';
 import { cliWorkerPreamble, PM_SYSTEM, workerSystem } from './agents/prompts.ts';
 import { Runner, type AgentSpec, type InboxItem, type Outcome } from './agents/runner.ts';
@@ -719,6 +720,7 @@ export const orch: Orch & {
       telegram: telegram.status(),
       alerts: alerts.status(),
       speech: speechStatus(),
+      usage: usageSummary(),
       limits: getLimits(),
       google: googleStatus(),
       demo: DEMO || getSettings().pm.runtime === 'demo',

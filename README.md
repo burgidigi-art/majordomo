@@ -285,7 +285,8 @@ files you send in, and one workspace folder per project. A project can instead p
 - **Skills** — Settings → Skills (also in the sidebar). A skill is a folder of instructions, a `SKILL.md` and sometimes
   scripts, that teaches an agent a kind of work. Majordomo finds the ones already on your computer, wherever Claude Code
   (including installed plugins), Codex, Hermes or `~/.agents/skills` keep them, and you can add more from any GitHub
-  repository (`owner/name`), then update or remove it later. Every skill switched on is offered to the whole crew on any
+  repository (`owner/name`), or search GitHub from the same page (*Find skills on GitHub*: by topic, most-starred or
+  best match, with collections tagged as skills marked), then update or remove it later. Every skill switched on is offered to the whole crew on any
   account: each task's brief lists them with where their instructions are, the agent reads one when it fits, and the
   manager can name one in a brief. Claude Code agents also use their own skills and plugins directly. Skills already on
   your computer start switched on; skills from a repository start **off**, because they are instructions written by
@@ -309,6 +310,10 @@ files you send in, and one workspace folder per project. A project can instead p
   to steer it mid-task, answer its question, or ask a finished agent for a follow-up. Stop or retry from there.
 - **Projects** — a board of each project's tasks, a browser for the files agents produced, and the goal and notes.
 - **Activity** — a timeline of every agent across all projects, with tokens and cost per account.
+  - *Tokens by model*, live: calls, input, output and cached tokens for each model on each account, for today, the last
+    7 days or all time, with the cost on metered keys. Numbers move as the provider reports them: after every request on
+    an API key, after every step for Claude Code, and once a run ends for Codex and Gemini CLI, whose own output does
+    not report sooner. The dashboard is told within about a second.
 - **Memory** — what the manager has saved about you, and the reminders it has set for itself.
 - **Email and calendar** — read-and-draft access to Gmail and Google Calendar; see below.
 - **Your phone** — the same manager over Telegram; see below.

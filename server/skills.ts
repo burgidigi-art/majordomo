@@ -194,6 +194,77 @@ export function enabledSkillNames(): string[] {
     .map((s) => s.name);
 }
 
+// ---------- finding skills on GitHub ----------
+
+export interface FoundRepo {
+  name: string;
+  description: string;
+  stars: number;
+  updatedAt: number;
+  url: string;
+  /** Tagged on GitHub as a collection of agent or Claude skills. */
+  tagged: boolean;
+  /** Already added here. */
+  added: boolean;
+}
+
+const SKILL_TOPICS = new Set(['agent-skills', 'claude-skills', 'skills', 'claude-code-skills', 'anthropic-skills', 'agent-skill', 'skill']);
+const searchCache = new Map<string, { at: number; repos: Omit<FoundRepo, 'added'>[] }>();
+let fetchGitHub: typeof fetch = (...args) => fetch(...args);
+export function _setGitHubFetch(fn: typeof fetch | null): void {
+  fetchGitHub = fn ?? ((...args) => fetch(...args));
+  searchCache.clear();
+}
+
+/**
+ * Search GitHub for repositories of skills. The user's words are searched together with "skills",
+ * which finds collections whether or not they are tagged; with no words, the most-starred repositories
+ * tagged as agent skills are shown. GitHub allows about ten searches a minute without signing in, so
+ * results are kept for five minutes.
+ */
+export async function searchSkillRepos(query: string, sort: 'stars' | 'best' = 'stars'): Promise<FoundRepo[]> {
+  const words = query.replace(/[^\p{L}\p{N}\s.+#-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
+  const q = words ? `${words} skills` : 'topic:agent-skills';
+  const key = `${q}|${sort}`;
+  let hit = searchCache.get(key);
+  if (!hit || Date.now() - hit.at > 5 * 60_000) {
+    const url = new URL('https://api.github.com/search/repositories');
+    url.searchParams.set('q', q);
+    url.searchParams.set('per_page', '30');
+    if (sort === 'stars' || !words) url.searchParams.set('sort', 'stars');
+    let res: Response;
+    try {
+      res = await fetchGitHub(url, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Majordomo', 'X-GitHub-Api-Version': '2022-11-28' },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (err) {
+      throw new Error(`Could not reach GitHub: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (res.status === 403 || res.status === 429) {
+      const reset = Number(res.headers.get('x-ratelimit-reset')) * 1000;
+      const wait = reset ? Math.max(1, Math.ceil((reset - Date.now()) / 1000)) : 60;
+      throw new Error(`GitHub allows about ten searches a minute without signing in. Try again in ${wait} seconds.`);
+    }
+    const json = (await res.json().catch(() => null)) as any;
+    if (!res.ok) throw new Error(`GitHub search failed: ${json?.message ?? `HTTP ${res.status}`}`);
+    hit = {
+      at: Date.now(),
+      repos: (json?.items ?? []).map((r: any) => ({
+        name: String(r.full_name),
+        description: String(r.description ?? ''),
+        stars: Number(r.stargazers_count) || 0,
+        updatedAt: Date.parse(r.pushed_at ?? r.updated_at ?? '') || 0,
+        url: String(r.html_url),
+        tagged: (r.topics ?? []).some((t: string) => SKILL_TOPICS.has(t)),
+      })),
+    };
+    searchCache.set(key, hit);
+  }
+  const added = new Set(listRepos().map((r) => r.name.toLowerCase()));
+  return hit.repos.map((r) => ({ ...r, added: added.has(r.name.toLowerCase()) }));
+}
+
 // ---------- repositories ----------
 
 type Git = (args: string[], cwd?: string) => Promise<string>;

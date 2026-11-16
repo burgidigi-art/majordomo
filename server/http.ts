@@ -13,7 +13,7 @@ import { describeError, listModels } from './llm/index.ts';
 import { alerts } from './alerts.ts';
 import { finishPluginSignIn } from './plugin-auth.ts';
 import { addOwnServer, afterSignIn, pluginList, removeOwnServer, setPluginsEnabled, signInToPlugin, signOutOfPlugin, testPlugin } from './plugins.ts';
-import { addRepo, listRepos, listSkills, removeRepo, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
+import { addRepo, listRepos, listSkills, removeRepo, searchSkillRepos, setSkillsEnabled, SKILLS_DIR, updateRepo } from './skills.ts';
 import { speak } from './speech.ts';
 import { resolveVoice, transcribe, uploadedAudio } from './gateways/transcribe.ts';
 import { telegram } from './gateways/telegram.ts';
@@ -382,6 +382,11 @@ app.put('/api/skills', async (c) => {
   const known = new Set(listSkills().map((s) => s.id));
   setSkillsEnabled(body.ids.filter((id) => typeof id === 'string' && known.has(id)), body.enabled);
   return c.json(skillsPayload());
+});
+
+app.get('/api/skills/search', async (c) => {
+  const sort = c.req.query('sort') === 'best' ? 'best' : 'stars';
+  return c.json({ repos: await searchSkillRepos(c.req.query('q') ?? '', sort) });
 });
 
 app.post('/api/skills/repos', async (c) => {

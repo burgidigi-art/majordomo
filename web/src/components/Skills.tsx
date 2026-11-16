@@ -1,12 +1,110 @@
-import { ChevronDown, ChevronRight, Download, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ExternalLink, RefreshCw, Search, Star, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { Skill, SkillRepo } from '../../../shared/types.ts';
-import { api, type SkillsPayload } from '../api.ts';
+import { api, type FoundRepo, type SkillsPayload } from '../api.ts';
+import { compact } from '../lib.ts';
 import { ago } from '../lib.ts';
 import { attempt, Empty } from './ui.tsx';
 
 /** Well-known collections to start from. Anything else can be pasted in. */
 const SUGGESTED = [{ repo: 'anthropics/skills', what: 'Anthropic’s public examples: documents, spreadsheets, slides, design and more' }];
+
+/** Search GitHub for skill collections and add one with a click. */
+function FindOnGitHub({ onAdd, busy }: { onAdd: (repo: string) => Promise<boolean>; busy: string }) {
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState<'stars' | 'best'>('stars');
+  const [results, setResults] = useState<FoundRepo[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
+  const search = async (text = q, order = sort) => {
+    setSearching(true);
+    setError('');
+    try {
+      setResults((await api.searchSkills(text, order)).repos);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setSearching(false);
+  };
+  return (
+    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Find skills on GitHub</h3>
+      <div className="hint" style={{ marginTop: -4 }}>
+        Search by what you want your agents to get better at, like “instagram”, “invoices” or “seo”. Leave it empty for the most popular
+        collections.
+      </div>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="skill-search grow" style={{ minWidth: 220 }}>
+          <Search size={14} />
+          <input
+            className="input"
+            value={q}
+            placeholder="What should your agents be good at?"
+            aria-label="Search GitHub for skills"
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void search()}
+          />
+        </div>
+        <select
+          className="select"
+          style={{ width: 140 }}
+          value={sort}
+          aria-label="Order"
+          onChange={(e) => {
+            const next = e.target.value as 'stars' | 'best';
+            setSort(next);
+            if (results) void search(q, next);
+          }}
+        >
+          <option value="stars">Most stars</option>
+          <option value="best">Best match</option>
+        </select>
+        <button className="btn primary" disabled={searching} onClick={() => void search()}>
+          {searching ? 'Searching…' : 'Search'}
+        </button>
+      </div>
+      {error && <div className="plugin-error">{error}</div>}
+      {results && results.length === 0 && <div className="faint" style={{ fontSize: 13 }}>Nothing found. Try fewer or broader words.</div>}
+      {results && results.length > 0 && (
+        <div className="found-list">
+          {results.map((r) => (
+            <div key={r.name} className="found-row">
+              <span className="grow" style={{ minWidth: 0 }}>
+                <span className="found-title">
+                  <a href={r.url} target="_blank" rel="noreferrer noopener" className="skill-name">
+                    {r.name} <ExternalLink size={11} />
+                  </a>
+                  {r.tagged && <span className="plugin-status ok">Skills collection</span>}
+                </span>
+                {r.description && <span className="skill-desc">{r.description}</span>}
+                <span className="found-meta">
+                  <Star size={11} /> {compact(r.stars)}
+                  {r.updatedAt ? ` · updated ${ago(r.updatedAt)}` : ''}
+                </span>
+              </span>
+              {r.added ? (
+                <span className="faint" style={{ fontSize: 12.5, flex: 'none' }}>
+                  Added
+                </span>
+              ) : (
+                <button
+                  className="btn sm"
+                  style={{ flex: 'none' }}
+                  disabled={!!busy}
+                  onClick={() =>
+                    void onAdd(r.name).then((ok) => ok && setResults((list) => list?.map((x) => (x.name === r.name ? { ...x, added: true } : x)) ?? null))
+                  }
+                >
+                  <Download size={13} /> {busy === 'add' ? 'Adding…' : 'Add'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Group {
   key: string;
@@ -32,11 +130,12 @@ export function Skills() {
   };
   useEffect(() => void load(), []);
 
-  const run = async (label: string, fn: () => Promise<SkillsPayload>, success?: string) => {
+  const run = async (label: string, fn: () => Promise<SkillsPayload>, success?: string): Promise<boolean> => {
     setBusy(label);
     const next = await attempt(fn, success);
     if (next) setData(next);
     setBusy('');
+    return !!next;
   };
 
   const groups = useMemo<Group[]>(() => {
@@ -57,13 +156,16 @@ export function Skills() {
   const total = data.skills.length;
   const on = data.skills.filter((s) => s.enabled).length;
 
-  const addRepo = (value = repo) => {
-    if (!value.trim()) return;
-    void run('add', () => api.addSkillRepo(value.trim()), 'Added. Its skills are listed below, switched off until you turn them on.').then(() => setRepo(''));
+  const addRepo = async (value = repo): Promise<boolean> => {
+    if (!value.trim()) return false;
+    const ok = await run('add', () => api.addSkillRepo(value.trim()), 'Added. Its skills are listed below, switched off until you turn them on.');
+    if (ok) setRepo('');
+    return ok;
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <FindOnGitHub onAdd={addRepo} busy={busy} />
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Add skills from a repository</h3>
         <div className="hint" style={{ marginTop: -4 }}>

@@ -5,7 +5,7 @@ import { costOf, describeError, getProvider } from '../llm/index.ts';
 import { textOf, type Msg, type Part, type Usage } from '../llm/types.ts';
 import { getSettings, runtimeDef } from '../settings.ts';
 import { ToolError, toolDef, type Host, type Tool } from '../tools/tool.ts';
-import { runCliTurn } from './cli.ts';
+import { runCliTurn, usageMinus } from './cli.ts';
 import { COMPACT_PROMPT } from './prompts.ts';
 
 export interface InboxItem {
@@ -170,6 +170,11 @@ export class Runner {
       mcp: spec.mcp,
       manager: spec.manager,
       readDirs: spec.readDirs,
+      // Claude Code reports each model call as it happens; count it then, not only at the end.
+      onUsage: (usage, model) => {
+        this.hooks.onUsage(spec.id, usage, 0, true);
+        emit(spec.id, 'usage', { ...usage, model, runtime: spec.runtime, included: true });
+      },
       signal,
     });
     if (result.session) {
@@ -177,8 +182,12 @@ export class Runner {
       kvSet(`session-rt:${spec.id}`, spec.runtime);
     }
     // Usage on a CLI login is covered by the plan; any dollar figure the CLI reports is notional.
-    this.hooks.onUsage(spec.id, result.usage, result.costUsd ?? 0, true);
-    emit(spec.id, 'usage', { ...result.usage, model: spec.model || 'default' });
+    // Whatever the CLI's end-of-run total has beyond what was counted along the way is counted now.
+    const rest = usageMinus(result.usage, result.reported);
+    if (rest.input + rest.output + rest.cacheRead + rest.cacheWrite > 0) {
+      this.hooks.onUsage(spec.id, rest, result.costUsd ?? 0, true);
+      emit(spec.id, 'usage', { ...rest, model: result.model, runtime: spec.runtime, included: true });
+    }
     return result.text;
   }
 
@@ -248,7 +257,7 @@ export class Runner {
         else if (p.type === 'tool_call') emit(spec.id, 'tool_call', { id: p.id, name: p.name, input: p.input, server: p.server });
         else if (p.type === 'tool_result') emit(spec.id, 'tool_result', { id: p.id, output: p.output, isError: p.isError });
       }
-      emit(spec.id, 'usage', { ...res.usage, model: res.model });
+      emit(spec.id, 'usage', { ...res.usage, model: res.model, runtime: spec.runtime, costUsd: costOf(spec.runtime, res.model, res.usage), included: false });
 
       if (res.stop === 'pause') continue;
       if (res.stop === 'refusal') {

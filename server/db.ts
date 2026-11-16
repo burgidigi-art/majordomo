@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS events (
   type TEXT NOT NULL, data TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_agent ON events(agent_id, id);
+CREATE INDEX IF NOT EXISTS events_type_ts ON events(type, ts);
 CREATE TABLE IF NOT EXISTS messages (
   agent_id TEXT NOT NULL, seq INTEGER NOT NULL, payload TEXT NOT NULL,
   PRIMARY KEY (agent_id, seq)

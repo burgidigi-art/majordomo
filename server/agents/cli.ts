@@ -33,13 +33,20 @@ export interface CliTurn {
   manager: boolean;
   /** Folders outside the workspace a worker may read: where its skills live. */
   readDirs?: string[];
+  /** Usage as it happens, one model call at a time, for CLIs that report it that way (Claude Code). */
+  onUsage?: (usage: Usage, model: string) => void;
   signal: AbortSignal;
 }
 
 export interface CliResult {
   text: string;
   session: string | null;
+  /** The whole turn's usage, as the CLI totals it at the end. */
   usage: Usage;
+  /** What was already passed to onUsage along the way, so the end does not count it twice. */
+  reported: Usage;
+  /** The model the CLI says it used, when it says. */
+  model: string;
   costUsd?: number;
 }
 
@@ -54,6 +61,10 @@ interface RunState {
   text: string;
   session: string | null;
   usage: Usage;
+  reported: Usage;
+  model: string;
+  /** The usage last seen for each model message, since Claude Code repeats it per content block. */
+  perMessage: Map<string, Usage>;
   costUsd?: number;
   error?: string;
   block: number;
@@ -69,6 +80,43 @@ function resultText(content: unknown): string {
     return content.map((c) => (c?.type === 'text' ? c.text : c?.type ? `[${c.type}]` : stringify(c))).join('\n');
   }
   return stringify(content);
+}
+
+/** Field-by-field a - b, never below zero. */
+export function usageMinus(a: Usage, b: Usage): Usage {
+  return {
+    input: Math.max(0, a.input - b.input),
+    output: Math.max(0, a.output - b.output),
+    cacheRead: Math.max(0, a.cacheRead - b.cacheRead),
+    cacheWrite: Math.max(0, a.cacheWrite - b.cacheWrite),
+  };
+}
+
+const anyUsage = (u: Usage) => u.input + u.output + u.cacheRead + u.cacheWrite > 0;
+
+/**
+ * Claude Code reports each model call's usage on its assistant messages, so usage can be counted as
+ * it happens rather than only when the whole run ends. A message arrives once per content block,
+ * with its usage so far, so only the growth since the last sighting of that message is new.
+ */
+function reportClaudeUsage(message: any, s: RunState): void {
+  const u = message?.usage;
+  if (!u || !message.id) return;
+  const cacheRead = u.cache_read_input_tokens ?? 0;
+  const cacheWrite = u.cache_creation_input_tokens ?? 0;
+  const now: Usage = { input: (u.input_tokens ?? 0) + cacheRead + cacheWrite, output: u.output_tokens ?? 0, cacheRead, cacheWrite };
+  const before = s.perMessage.get(message.id) ?? { ...EMPTY_USAGE };
+  s.perMessage.set(message.id, now);
+  const fresh = usageMinus(now, before);
+  if (!anyUsage(fresh)) return;
+  s.reported = {
+    input: s.reported.input + fresh.input,
+    output: s.reported.output + fresh.output,
+    cacheRead: s.reported.cacheRead + fresh.cacheRead,
+    cacheWrite: s.reported.cacheWrite + fresh.cacheWrite,
+  };
+  if (typeof message.model === 'string') s.model = message.model;
+  s.turn.onUsage?.(fresh, s.model);
 }
 
 // ---------- Claude Code ----------
@@ -110,6 +158,7 @@ const claude: Driver = {
     switch (line.type) {
       case 'system':
         if (line.subtype === 'init' && line.session_id) s.session = line.session_id;
+        if (line.subtype === 'init' && typeof line.model === 'string') s.model = line.model;
         break;
       case 'rate_limit_event':
         recordClaudeLimits(line.rate_limit_info);
@@ -125,6 +174,7 @@ const claude: Driver = {
         break;
       }
       case 'assistant': {
+        reportClaudeUsage(line.message, s);
         const sub = !!line.parent_tool_use_id;
         for (const b of line.message?.content ?? []) {
           if (b.type === 'text' && b.text?.trim()) {
@@ -317,6 +367,7 @@ const gemini: Driver = {
     switch (line.type) {
       case 'init':
         if (line.session_id) s.session = line.session_id;
+        if (typeof line.model === 'string' && line.model) s.model = line.model;
         break;
       case 'message':
         if (line.role === 'assistant' && typeof line.content === 'string') {
@@ -390,6 +441,10 @@ export function runCliTurn(turn: CliTurn): Promise<CliResult> {
       text: '',
       session: built.session ?? turn.session ?? null,
       usage: { ...EMPTY_USAGE },
+      reported: { ...EMPTY_USAGE },
+      // Until the CLI names it: the model asked for, or the account's default.
+      model: turn.model || `${turn.runtime} default`,
+      perMessage: new Map(),
       block: 0,
       seen: new Set(),
     };
@@ -444,7 +499,7 @@ export function runCliTurn(turn: CliTurn): Promise<CliResult> {
         const detail = (stderr || stray).trim().split('\n').slice(-6).join('\n');
         return reject(new Error(`\`${bin}\` exited with code ${code}.${detail ? `\n${detail}` : ''}`));
       }
-      resolve({ text: state.text.trim(), session: state.session, usage: state.usage, costUsd: state.costUsd });
+      resolve({ text: state.text.trim(), session: state.session, usage: state.usage, reported: state.reported, model: state.model, costUsd: state.costUsd });
     });
   });
 }

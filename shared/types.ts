@@ -279,6 +279,31 @@ export interface PluginServer {
   signedIn: boolean;
 }
 
+/** Tokens one model has used, on one account, over some period. */
+export interface ModelUsage {
+  runtime: string;
+  model: string;
+  /** Model calls: one per request to an API, one per step for Claude Code, one per run for Codex and Gemini CLI. */
+  calls: number;
+  /** Everything the model read, cached or not. */
+  input: number;
+  output: number;
+  /** The part of input served from the provider's cache, which is cheaper or free. */
+  cacheRead: number;
+  /** Dollars on metered API keys; 0 where a subscription covers it. */
+  costUsd: number;
+  /** Covered by a subscription rather than billed per token. */
+  included: boolean;
+  lastAt: number;
+}
+
+export interface UsageSummary {
+  today: ModelUsage[];
+  week: ModelUsage[];
+  all: ModelUsage[];
+  updatedAt: number;
+}
+
 /** How the user is told when something needs them. */
 export interface AlertSettings {
   /** Notifications are posted through macOS, so only offered there. */
@@ -300,6 +325,7 @@ export interface AppState {
   pm: PmStatus;
   telegram: TelegramStatus;
   alerts: AlertSettings;
+  usage: UsageSummary;
   /** Reading replies aloud: whether OpenAI's voices are available (an OpenAI key is saved). */
   speech: { openai: boolean; voices: string[] };
   limits: Partial<Record<RuntimeId, AccountLimits>>;

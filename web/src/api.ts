@@ -19,6 +19,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T = { ok: true }>(path: string, body?: unknown) =>
   request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 
+export interface FoundRepo {
+  name: string;
+  description: string;
+  stars: number;
+  updatedAt: number;
+  url: string;
+  tagged: boolean;
+  added: boolean;
+}
+
 export interface SkillsPayload {
   skills: Skill[];
   repos: SkillRepo[];
@@ -61,6 +71,8 @@ export const api = {
   pluginSignOut: (id: string) => request<{ plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/sign-in`, { method: 'DELETE' }),
   testPlugin: (id: string) =>
     post<{ ok: boolean; error?: string; tools?: { name: string; description: string }[]; plugins: PluginServer[] }>(`/api/plugins/${encodeURIComponent(id)}/test`),
+  searchSkills: (q: string, sort: 'stars' | 'best') =>
+    request<{ repos: FoundRepo[] }>(`/api/skills/search?q=${encodeURIComponent(q)}&sort=${sort}`),
   skills: (rescan = false) => request<SkillsPayload>(`/api/skills${rescan ? '?rescan=1' : ''}`),
   setSkills: (ids: string[], enabled: boolean) => request<SkillsPayload>('/api/skills', { method: 'PUT', body: JSON.stringify({ ids, enabled }) }),
   addSkillRepo: (url: string) => post<SkillsPayload>('/api/skills/repos', { url }),
