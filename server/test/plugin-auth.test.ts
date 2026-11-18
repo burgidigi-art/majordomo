@@ -125,7 +125,7 @@ test('a hosted plugin with no key is offered a browser sign-in, and says so unti
   await assert.rejects(use(), /needs the user to sign in.*Settings → Plugin tools.*Sign in/);
 });
 
-test('signing in: Chiba registers itself, sends the browser to the service, and takes back the code', async () => {
+test('signing in: 00Dojo registers itself, sends the browser to the service, and takes back the code', async () => {
   const start = await app.request(`/api/plugins/${encodeURIComponent(id)}/sign-in`, { method: 'POST', headers: local });
   assert.equal(start.status, 200);
   const { url } = (await start.json()) as { url: string };
@@ -139,7 +139,7 @@ test('signing in: Chiba registers itself, sends the browser to the service, and 
   assert.deepEqual(svc.registered[0].redirect_uris, ['http://localhost:4317/api/plugins/oauth/callback']);
   assert.equal(svc.registered[0].token_endpoint_auth_method, 'none');
 
-  // The user approves in the browser, which comes back to Chiba with a code.
+  // The user approves in the browser, which comes back to 00Dojo with a code.
   const approved = await fetch(url, { redirect: 'manual' });
   const back = new URL(approved.headers.get('location')!);
   const done = await app.request(back.pathname + back.search, { headers: { host: 'localhost:4317' } });

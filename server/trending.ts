@@ -1,13 +1,13 @@
 // "What's hot in the streets": GitHub's top 10 trending repositories today, for the dashboard.
 // GitHub has no API for its Trending page, so the page itself is read; if that fails (GitHub changed
 // the page, or it cannot be reached), the most-starred repositories created this week stand in, from
-// GitHub's official search. Refreshed when Chiba starts, when the dashboard is opened, and every
+// GitHub's official search. Refreshed when 00Dojo starts, when the dashboard is opened, and every
 // day at 12:01 am.
 import type { TrendingRepo, TrendingState } from '../shared/types.ts';
 import { sync } from './bus.ts';
 import { kvGet, kvSet } from './db.ts';
 
-const HEADERS = { 'User-Agent': 'Chiba', Accept: 'text/html,application/json' };
+const HEADERS = { 'User-Agent': '00Dojo', Accept: 'text/html,application/json' };
 let fetcher: typeof fetch = (...a) => fetch(...a);
 export function _setTrendingFetch(fn: typeof fetch | null): void {
   fetcher = fn ?? ((...a) => fetch(...a));
@@ -65,7 +65,7 @@ async function fromSearch(): Promise<TrendingRepo[]> {
   url.searchParams.set('q', `created:>${since}`);
   url.searchParams.set('sort', 'stars');
   url.searchParams.set('per_page', '10');
-  const res = await fetcher(url, { headers: { 'User-Agent': 'Chiba', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15_000) });
+  const res = await fetcher(url, { headers: { 'User-Agent': '00Dojo', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`GitHub search answered HTTP ${res.status}`);
   const json = (await res.json()) as any;
   return (json?.items ?? []).slice(0, 10).map((r: any, i: number) => ({

@@ -202,7 +202,7 @@ export interface TelegramStatus {
   connected: boolean;
   botUsername: string;
   error: string;
-  /** One-time code that links a Telegram chat to this Chiba. */
+  /** One-time code that links a Telegram chat to this 00Dojo. */
   pairCode: string;
   chats: TelegramChat[];
   /** Also push the manager's own updates (work finished, approvals needed), not just replies. */
@@ -272,7 +272,7 @@ export interface PluginServer {
   status: 'idle' | 'running' | 'error' | 'needs-sign-in' | 'unsupported';
   error: string;
   tools: { name: string; description: string }[];
-  /** Added by hand in Chiba, so it can be removed here. */
+  /** Added by hand in 00Dojo, so it can be removed here. */
   removable: boolean;
   /** At an address with no key of its own: it can be signed in to through the browser. */
   canSignIn: boolean;

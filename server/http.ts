@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMessage, VoiceSettings } from '../shared/types.ts';
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
-import { events, memory, projects, reminders, tasks } from './db.ts';
+import { DATA_DIR, events, memory, projects, reminders, tasks } from './db.ts';
 import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient, startSignIn } from './google.ts';
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
@@ -46,7 +46,7 @@ app.use('*', async (c, next) => {
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
-    if (!TOKEN) return c.text('Chiba only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
+    if (!TOKEN) return c.text('00Dojo only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
     const given = url.searchParams.get('token') ?? c.req.header('authorization')?.replace(/^Bearer /, '') ?? cookie(c.req.header('cookie'), 'mj_token');
     if (given !== TOKEN) return c.text('Access token required.', 401);
     if (url.searchParams.has('token')) c.header('Set-Cookie', `mj_token=${TOKEN}; HttpOnly; SameSite=Strict; Path=/`);
@@ -77,8 +77,27 @@ app.onError((err, c) => c.json({ error: describeError(err) }, 400));
 
 // ---------- state + live stream ----------
 
-// A cheap check that this is Chiba and that it is answering; the Mac app polls it while starting up.
+// A cheap check that this is 00Dojo and that it is answering; the Mac app polls it while starting up.
 app.get('/api/health', (c) => c.json({ ok: true, app: 'majordomo' }));
+
+// The mark in the sidebar and the browser tab. A personal icon set with `npm run set-icon` lives in
+// the data folder and wins over the built-in drawing. A personal icon is a PNG with the margin macOS
+// wants around an app icon (the tile is 824 of 1024 across), so it is wrapped in an SVG that crops to the tile.
+const BUILT_IN_MARK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public/favicon.svg');
+app.get('/api/brand.svg', async (c) => {
+  const headers = { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' };
+  const personal = path.join(DATA_DIR, 'icon');
+  for (const file of [path.join(personal, 'icon-256.png'), path.join(personal, 'icon.png')]) {
+    const png = await fs.readFile(file).catch(() => null);
+    if (!png) continue;
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">' +
+      `<image width="1024" height="1024" href="data:image/png;base64,${png.toString('base64')}"/></svg>`;
+    return c.body(svg, 200, headers);
+  }
+  const builtIn = await fs.readFile(BUILT_IN_MARK, 'utf8').catch(() => null);
+  return builtIn ? c.body(builtIn, 200, headers) : c.text('No icon.', 404);
+});
 
 app.get('/api/state', async (c) => c.json(await orch.state()));
 
@@ -359,7 +378,7 @@ app.post('/api/setup/adopt', async (c) => {
 /** Speech typed into the dashboard: the browser records, the voice-note transcriber turns it into text. */
 app.post('/api/transcribe', async (c) => {
   const kind = uploadedAudio(c.req.header('content-type') ?? '');
-  if (!kind) return c.json({ error: 'That recording is in a format Chiba does not know.' }, 415);
+  if (!kind) return c.json({ error: 'That recording is in a format 00Dojo does not know.' }, 415);
   const bytes = Buffer.from(await c.req.arrayBuffer());
   if (!bytes.length) return c.json({ error: 'The recording was empty. Check that the microphone is allowed.' }, 400);
   if (bytes.length > 25 * 1024 * 1024) return c.json({ error: 'That recording is too long to transcribe. Keep it under about 20 minutes.' }, 413);
@@ -443,7 +462,7 @@ app.get('/api/plugins/oauth/callback', async (c) => {
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title>` +
         '<style>body{font:16px/1.5 -apple-system,system-ui,sans-serif;background:#0b0b0f;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px}' +
         'main{max-width:420px;text-align:center}h1{font-size:22px;margin:0 0 8px}p{color:#aaa}a{color:#f3b65f}</style>' +
-        `<main><h1>${ok ? '✓ ' : ''}${escape(title)}</h1><p>${escape(body)}</p><p><a href="/#/settings/plugins">Back to Chiba</a></p></main>` +
+        `<main><h1>${ok ? '✓ ' : ''}${escape(title)}</h1><p>${escape(body)}</p><p><a href="/#/settings/plugins">Back to 00Dojo</a></p></main>` +
         (ok ? '<script>setTimeout(()=>window.close(),1500)</script>' : ''),
       ok ? 200 : 400,
     );

@@ -115,7 +115,7 @@ function mediaOf(m: any): Media | null {
 // ---------- the gateway ----------
 
 const HELP = [
-  '**Chiba** — your project manager, on your phone.',
+  '**00Dojo** — your project manager, on your phone.',
   '',
   'Just write to me like you would at the desk: describe a project, ask where something stands, change your mind. Voice notes work too, and you can send photos and files.',
   '',
@@ -355,7 +355,7 @@ class TelegramGateway {
       const last = this.refused.get(chatId) ?? 0;
       if (Date.now() - last > 10 * 60_000) {
         this.refused.set(chatId, Date.now());
-        await this.send(chatId, 'This bot is private. To link this chat, open Chiba on your computer, go to Settings → Phone, and use the pairing link shown there.');
+        await this.send(chatId, 'This bot is private. To link this chat, open 00Dojo on your computer, go to Settings → Phone, and use the pairing link shown there.');
       }
       return;
     }
@@ -382,7 +382,7 @@ class TelegramGateway {
         await this.send(chatId, 'Stopped. Agents already working carry on; tell me if you want any of them cancelled.');
         return;
       case 'unlink':
-        await this.send(chatId, 'Unlinked. This chat can no longer reach your Chiba.');
+        await this.send(chatId, 'Unlinked. This chat can no longer reach your 00Dojo.');
         this.unpair(chatId);
         return;
       default:
@@ -396,7 +396,7 @@ class TelegramGateway {
   private async handleVoice(chatId: number, audio: any, caption: string): Promise<void> {
     const { backend, problem } = resolveVoice();
     if (!backend) {
-      await this.send(chatId, `I can't listen to voice notes yet. ${problem} You can set this up in Chiba under Settings → Phone → Voice notes.`);
+      await this.send(chatId, `I can't listen to voice notes yet. ${problem} You can set this up in 00Dojo under Settings → Phone → Voice notes.`);
       return;
     }
     // Telegram lets a bot download files up to 20 MB.

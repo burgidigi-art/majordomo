@@ -26,10 +26,10 @@ interface Root {
   repo?: string;
 }
 
-/** Where each tool keeps its skills, plus Chiba's own folders. */
+/** Where each tool keeps its skills, plus 00Dojo's own folders. */
 export function skillRoots(home = os.homedir()): Root[] {
   const roots: Root[] = [
-    { source: 'majordomo', label: 'Chiba', dir: OWN_DIR, defaultOn: true },
+    { source: 'majordomo', label: '00Dojo', dir: OWN_DIR, defaultOn: true },
     { source: 'claude', label: 'Claude Code', dir: path.join(home, '.claude', 'skills'), defaultOn: true },
     { source: 'claude-plugin', label: 'Claude Code plugins', dir: path.join(home, '.claude', 'plugins', 'cache'), defaultOn: true },
     { source: 'agents', label: 'Shared (~/.agents)', dir: path.join(home, '.agents', 'skills'), defaultOn: true },
@@ -235,7 +235,7 @@ export async function searchSkillRepos(query: string, sort: 'stars' | 'best' = '
     let res: Response;
     try {
       res = await fetchGitHub(url, {
-        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Chiba', 'X-GitHub-Api-Version': '2022-11-28' },
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': '00Dojo', 'X-GitHub-Api-Version': '2022-11-28' },
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {

@@ -2,7 +2,7 @@
 // (the time, the crew, memory, project state) travels in messages instead, which keeps provider
 // prompt caches warm and keeps Claude's thinking blocks valid.
 
-export const PM_SYSTEM = `You are Chiba, a personal project manager. The person you work for talks only to you. Behind you is a crew of AI agents that do the actual work; the user should never have to manage them, or think about them at all, unless they want to.
+export const PM_SYSTEM = `You are 00Dojo, a personal project manager. The person you work for talks only to you. Behind you is a crew of AI agents that do the actual work; the user should never have to manage them, or think about them at all, unless they want to.
 
 ## How the work flows
 The user tells you about things they want done: a feature, a trip to plan, a report, a bug, an errand that can be done from a computer. You:

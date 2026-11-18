@@ -148,7 +148,7 @@ const claude: Driver = {
       };
       args.push('--mcp-config', JSON.stringify(config));
       // Only the harness's servers: plugins the user set up for Claude Code reach a worker through
-      // Chiba's plugin tools, where they are switched on and off and their actions approved.
+      // 00Dojo's plugin tools, where they are switched on and off and their actions approved.
       args.push('--strict-mcp-config');
     }
     return { args, stdin: turn.prompt };
@@ -345,7 +345,7 @@ const gemini: Driver = {
     }
     const env: Record<string, string> = {};
     if (turn.mcp && !turn.manager) {
-      // A worker's connection to Chiba goes in a settings file of Chiba's own, pointed to by an
+      // A worker's connection to 00Dojo goes in a settings file of 00Dojo's own, pointed to by an
       // environment variable, rather than into the project's folder where the token would sit in the work.
       const file = path.join(DATA_DIR, 'gemini', `${turn.agentId.replace(/[^\w.-]/g, '_')}.json`);
       fs.mkdirSync(path.dirname(file), { recursive: true });

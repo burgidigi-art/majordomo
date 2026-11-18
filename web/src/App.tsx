@@ -65,16 +65,16 @@ function Opening() {
       <div style={{ maxWidth: 520, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         {error ? (
           <>
-            <b>Chiba could not load.</b>
+            <b>00Dojo could not load.</b>
             <span className="faint mono" style={{ fontSize: 12.5, overflowWrap: 'anywhere' }}>
               {error}
             </span>
             <span className="faint" style={{ fontSize: 13 }}>
-              Its log is at ~/.majordomo/logs/server.log. If this keeps happening, run npm run install-app again in the Chiba folder.
+              Its log is at ~/.majordomo/logs/server.log. If this keeps happening, run npm run install-app again in its folder (usually ~/majordomo).
             </span>
           </>
         ) : (
-          <span className="faint">{slow ? 'Still opening the desk… Chiba is taking longer than usual to answer.' : 'Opening the desk…'}</span>
+          <span className="faint">{slow ? 'Still opening the desk… 00Dojo is taking longer than usual to answer.' : 'Opening the desk…'}</span>
         )}
         {(error || slow) && (
           <button className="btn" onClick={() => void useStore.getState().refresh()}>
@@ -84,6 +84,11 @@ function Opening() {
       </div>
     </div>
   );
+}
+
+/** The zeros of the name, in the monospace face: its zero has a slash, so they cannot be read as the letter O. */
+function Zeros() {
+  return <span className="zeros">00</span>;
 }
 
 export function App() {
@@ -106,7 +111,7 @@ export function App() {
 
   const live = app?.tasks.filter(isLive).length ?? 0;
   useEffect(() => {
-    document.title = live ? `(${live}) Chiba` : 'Chiba';
+    document.title = live ? `(${live}) 00Dojo` : '00Dojo';
   }, [live]);
 
   if (!app) {
@@ -134,10 +139,13 @@ export function App() {
       <nav className="sidebar" aria-label="Main">
         <a href="#/" className="brand">
           <span className="brand-mark">
-            <img src="/favicon.svg" alt="" width="34" height="34" />
+            <img src="/api/brand.svg" alt="" width="34" height="34" />
           </span>
           <span className="brand-text">
-            <div className="brand-name">Chiba</div>
+            <div className="brand-name">
+              <Zeros />
+              Dojo
+            </div>
             <div className="brand-tag">Your crew, managed</div>
           </span>
         </a>
@@ -216,7 +224,10 @@ export function App() {
       <main className="main">
         <header className="topbar">
           <div className="crumbs">
-            <span className="root">Chiba</span>
+            <span className="root">
+              <Zeros />
+              Dojo
+            </span>
             <span className="sep">/</span>
             <span className="here truncate">{here}</span>
             <span className={`conn${connected ? '' : ' off'}`} title={connected ? 'Connected' : 'Reconnecting…'} />

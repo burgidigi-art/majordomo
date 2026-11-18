@@ -60,14 +60,14 @@ export const alerts = {
   /** An agent's command is waiting for the user's Allow or Decline. */
   needsApproval(task: Task | null | undefined, summary: string): void {
     const who = task ? task.crewName : 'An agent';
-    alerts.mac('Chiba · needs your approval', `${who} wants to run a command${summary ? `: ${summary}` : ''}`);
+    alerts.mac('00Dojo · needs your approval', `${who} wants to run a command${summary ? `: ${summary}` : ''}`);
   },
 
   /** A task the user gave (not a helper inside one) failed. The manager is told too and may retry it. */
   taskFailed(task: Task): void {
     if (task.parentId) return;
     const error = clip(task.error.split('\n')[0] ?? '', 160);
-    alerts.mac(`Chiba · ${task.crewName}'s task failed`, `${task.title}${error ? ` — ${error}` : ''}`);
+    alerts.mac(`00Dojo · ${task.crewName}'s task failed`, `${task.title}${error ? ` — ${error}` : ''}`);
     if (alerts.status().phoneFailures) {
       telegram.alert(`**${task.crewName}'s task failed:** ${task.title}${error ? `\n\n${error}` : ''}\n\n_Your manager has been told and will retry or report back._`);
     }

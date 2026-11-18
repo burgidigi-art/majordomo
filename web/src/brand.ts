@@ -1,4 +1,4 @@
-// Chiba's mark: a cartoon mid-shot of a karate gi, from the knees to the neck, tied with a black belt.
+// 00Dojo's mark: a cartoon mid-shot of a karate gi, from the knees to the neck, tied with a black belt.
 // One drawing serves the Mac app icon, the browser tab icon and the logo in the dashboard. Two poses:
 // grip (hands holding the belt near its ends) or sides (arms hanging, hands just below the belt).
 
@@ -110,7 +110,7 @@ export function markSvg({ pose, tile, id = 'chiba' }: MarkOptions): string {
   const p = `${id}-`;
   const box = tile ? { x: 100, size: 824, rx: 186 } : { x: 0, size: 1024, rx: 230 };
   const scale = box.size / 256;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Chiba">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="00Dojo">
   <defs>
     <linearGradient id="${p}tile" x1="0.15" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="#f9ad7c"/><stop offset="1" stop-color="#ea5f38"/></linearGradient>
     <clipPath id="${p}clip"><rect x="${box.x}" y="${box.x}" width="${box.size}" height="${box.size}" rx="${box.rx}"/></clipPath>
