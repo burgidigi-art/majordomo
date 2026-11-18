@@ -496,7 +496,7 @@ function Google() {
             send it yourself.
           </li>
           <li>
-            Google has no “drafts only” permission, so the sign-in you approved technically allows sending. Majordomo has no code path that sends,
+            Google has no “drafts only” permission, so the sign-in you approved technically allows sending. 00Dojo has no code path that sends,
             and refuses the send request outright.
           </li>
           <li>Mail is written by other people. The manager is told to treat what it reads as information, never as instructions.</li>
@@ -624,7 +624,7 @@ export function Settings({ section }: { section?: string }) {
           <h2>Accounts</h2>
           <p>
             Subscriptions are used through each vendor’s own command-line agent, which holds your login — sign in once in a terminal and
-            Majordomo drives it. API keys are billed per token and stay on this computer.
+            00Dojo drives it. API keys are billed per token and stay on this computer.
           </p>
           <div className="acct-grid">
             {app.runtimes.map((rt) => (
@@ -637,7 +637,7 @@ export function Settings({ section }: { section?: string }) {
           <h2>Phone</h2>
           <p>
             Message your manager from Telegram: start projects, ask where things stand, and get told when work is done. Voice notes, photos and
-            files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while Majordomo is running
+            files work too, and the manager can send finished files back. The bot runs from this computer, so it answers while 00Dojo is running
             here.
           </p>
           <Phone />

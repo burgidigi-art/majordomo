@@ -1,6 +1,6 @@
 // The Mac app: a small launcher in Applications plus a background service that macOS starts at login.
 //
-// Majordomo.app holds no copy of the program. It asks the service (a launchd agent running this
+// 00Dojo.app holds no copy of the program. It asks the service (a launchd agent running this
 // checkout with `node bin/majordomo.mjs`) to start if it is not answering, then opens the dashboard
 // in a window of its own. Updating is still `git pull`, followed by `npm run install-app`.
 import { spawnSync } from 'node:child_process';
@@ -9,9 +9,12 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { iconPaths } from './icon.mjs';
 
 export const LABEL = 'app.majordomo.server';
-export const APP_NAME = 'Majordomo';
+export const APP_NAME = '00Dojo';
+/** Names the app has had. Installing or removing clears these out of Applications too. */
+const FORMER_NAMES = ['Majordomo'];
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Settings a person may have exported in their shell that the service should keep. Never secrets. */
@@ -81,7 +84,8 @@ export function plan({ root = ROOT, env = process.env, home = os.homedir(), exec
     port,
     node,
     script: path.join(root, 'bin', 'majordomo.mjs'),
-    icon: path.join(root, 'assets', 'Majordomo.icns'),
+    // A personal icon, if one was set with `npm run set-icon`, otherwise the built-in one.
+    icon: [iconPaths(dataDir).icns, path.join(root, 'assets', '00Dojo.icns')].find((file) => fs.existsSync(file)),
     version: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version,
     env: serviceEnv,
     // The address the server prints and the one the dashboard has always been opened at.
@@ -144,7 +148,7 @@ export function infoPlist(p) {
   <key>CFBundleDisplayName</key>
   <string>${APP_NAME}</string>
   <key>CFBundleIdentifier</key>
-  <string>app.majordomo.launcher</string>
+  <string>app.zerozerodojo.launcher</string>
   <key>CFBundleExecutable</key>
   <string>${APP_NAME}</string>
   <key>CFBundleIconFile</key>
@@ -178,6 +182,7 @@ HEALTH=${sh(p.health)}
 LABEL=${sh(LABEL)}
 PLIST=${sh(p.plist)}
 LOG=${sh(p.log)}
+ROOT=${sh(p.root)}
 WAIT="\${MAJORDOMO_APP_WAIT:-90}"
 DOMAIN="gui/$(id -u)"
 
@@ -203,14 +208,18 @@ fi
 
 if ! up; then
   recent="$(tail -n 8 "$LOG" 2>/dev/null)"
+  fix="To set it up again, open Terminal and run these two commands:
+
+cd '$ROOT'
+npm run install-app"
   if [ ! -f "$PLIST" ]; then
-    why="Its background service is not installed. In Terminal, in the Majordomo folder, run: npm run install-app"
+    why="Its background service is not installed. $fix"
   elif printf '%s' "$recent" | grep -qi 'operation not permitted'; then
-    why="macOS is not letting it read its own folder. Open System Settings > Privacy & Security > Files and Folders, find node, and switch on the folder Majordomo is kept in. Then open Majordomo again."
+    why="macOS is not letting it read its own folder ($ROOT). Open System Settings > Privacy & Security > Files and Folders, find node, and switch on that folder. Then open 00Dojo again."
   else
-    why="In Terminal, in the Majordomo folder, run: npm run install-app"
+    why="$fix"
   fi
-  tell "Majordomo did not start.
+  tell "00Dojo did not start.
 
 $why
 
@@ -291,6 +300,13 @@ function tail(file, lines) {
   }
 }
 
+/** Deletes the app from Applications, under this name and any it had before. */
+function removeApps(p) {
+  for (const dir of p.appDirs) {
+    for (const name of [APP_NAME, ...FORMER_NAMES]) fs.rmSync(path.join(dir, `${name}.app`), { recursive: true, force: true });
+  }
+}
+
 /** Stops the service if it is loaded. Safe to call when it is not. */
 function stopService(run, uid) {
   run('launchctl', ['bootout', `gui/${uid}/${LABEL}`]);
@@ -315,7 +331,7 @@ export async function install(p, sys = {}) {
   stopService(run, uid);
   if (!(await until(async () => !(await busy(p.port)), waits.release))) {
     throw new Error(
-      `Majordomo is already running here (something is using port ${p.port}).\n` +
+      `00Dojo is already running here (something is using port ${p.port}).\n` +
         'If it is running in a Terminal window, click that window and press Control + C to stop it.\n' +
         'Then run `npm run install-app` again.',
     );
@@ -328,7 +344,7 @@ export async function install(p, sys = {}) {
   // The app goes in the main Applications folder when this account may write there.
   const appDir = p.appDirs.find(writable) ?? p.appDirs[p.appDirs.length - 1];
   fs.mkdirSync(appDir, { recursive: true });
-  for (const dir of p.appDirs) fs.rmSync(path.join(dir, `${APP_NAME}.app`), { recursive: true, force: true });
+  removeApps(p);
   const app = path.join(appDir, `${APP_NAME}.app`);
   const contents = path.join(app, 'Contents');
   fs.mkdirSync(path.join(contents, 'MacOS'), { recursive: true });
@@ -361,15 +377,15 @@ export async function install(p, sys = {}) {
 
   const folder = guardedFolder(p.root, p.home);
   if (folder) {
-    say(`\n  Majordomo is kept in your ${folder} folder, which macOS protects.`);
+    say(`\n  00Dojo is kept in your ${folder} folder, which macOS protects.`);
     say(`  If a box appears asking whether “node” may access files in ${folder}, click Allow.`);
   }
-  say('\n  Starting Majordomo…');
+  say('\n  Starting 00Dojo…');
   if (!(await until(() => healthy(p.health), waits.start))) {
     const recent = tail(p.log, 15);
     const blocked = /operation not permitted/i.test(recent);
     throw new Error(
-      'The app is installed, but Majordomo did not start in the background.\n' +
+      'The app is installed, but 00Dojo did not start in the background.\n' +
         (blocked
           ? `macOS is not letting it read this folder. Open System Settings → Privacy & Security → Files and Folders,\nfind “node”, and switch on ${folder ?? 'this folder'}. Then run \`npm run install-app\` again.\n`
           : '') +
@@ -377,14 +393,14 @@ export async function install(p, sys = {}) {
     );
   }
 
-  say(`  Majordomo is running  →  ${p.url}\n`);
+  say(`  00Dojo is running  →  ${p.url}\n`);
   say(`  Open “${APP_NAME}” from your Applications folder, Launchpad or Spotlight.`);
   say('  To keep it in the Dock: open it, right-click its Dock icon, then Options → Keep in Dock.');
   if (p.shellKeys.length) {
     say(`\n  Note: ${p.shellKeys.join(', ')} ${p.shellKeys.length > 1 ? 'are' : 'is'} set in this Terminal, and the background service cannot see`);
     say('  Terminal settings. Paste those keys in the dashboard under Accounts (or Phone) if you have not already.');
   }
-  say('\n  After updating Majordomo (`git pull`), run `npm run install-app` again to restart it on the new version.');
+  say('\n  After updating 00Dojo (`git pull`), run `npm run install-app` again to restart it on the new version.');
   say('  To remove the app and stop the service: `npm run uninstall-app`. Your projects and settings are kept.\n');
   return { app };
 }
@@ -394,7 +410,7 @@ export async function uninstall(p, sys = {}) {
   const say = sys.say ?? ((line) => console.log(line));
   stopService(run, sys.uid ?? process.getuid());
   fs.rmSync(p.plist, { force: true });
-  for (const dir of p.appDirs) fs.rmSync(path.join(dir, `${APP_NAME}.app`), { recursive: true, force: true });
-  say('  Removed the Majordomo app and its background service.');
-  say('  Your projects, settings and saved keys are untouched. `npm start` still runs Majordomo from Terminal.\n');
+  removeApps(p);
+  say('  Removed the 00Dojo app and its background service.');
+  say('  Your projects, settings and saved keys are untouched. `npm start` still runs 00Dojo from Terminal.\n');
 }

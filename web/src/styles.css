@@ -257,15 +257,19 @@ a:hover {
   flex: none;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(145deg, var(--brand-2), var(--brand));
-  box-shadow: 0 8px 20px -8px var(--brand), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  object-fit: cover;
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.7);
 }
 .brand-name {
   font-size: 18px;
   font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1.1;
+}
+.zeros {
+  font-family: var(--font-mono);
+  letter-spacing: -0.05em;
+  margin-right: 0.04em;
 }
 .brand-tag {
   font-size: 8.5px;

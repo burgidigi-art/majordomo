@@ -202,7 +202,7 @@ export interface TelegramStatus {
   connected: boolean;
   botUsername: string;
   error: string;
-  /** One-time code that links a Telegram chat to this Majordomo. */
+  /** One-time code that links a Telegram chat to this 00Dojo. */
   pairCode: string;
   chats: TelegramChat[];
   /** Also push the manager's own updates (work finished, approvals needed), not just replies. */

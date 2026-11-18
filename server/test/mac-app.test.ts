@@ -61,7 +61,7 @@ test('the background service is described without secrets and survives odd paths
   // The log sits with the data, outside the folders macOS guards.
   assert.equal(p.log, path.join(home, '.majordomo', 'logs', 'server.log'));
   assert.equal(p.url, 'http://localhost:5123');
-  assert.match(mac.infoPlist(p), /<key>CFBundleExecutable<\/key>\s*<string>Majordomo<\/string>/);
+  assert.match(mac.infoPlist(p), /<key>CFBundleExecutable<\/key>\s*<string>00Dojo<\/string>/);
 });
 
 test('node is started through the path that survives an upgrade', () => {
@@ -106,7 +106,7 @@ function runLauncher(p: Plan, home: string, bin: string, wait = '5') {
   return spawnSync('bash', [script], { env: { HOME: home, PATH: `${bin}:/usr/bin:/bin`, MAJORDOMO_APP_WAIT: wait }, encoding: 'utf8' });
 }
 
-test('clicking the app opens the dashboard in its own window when Majordomo is running', () => {
+test('clicking the app opens the dashboard in its own window when 00Dojo is running', () => {
   const { home, p } = sandbox();
   const s = stubs(home, 'true');
   fs.mkdirSync(path.join(home, 'Applications', 'Google Chrome.app'), { recursive: true });
@@ -135,7 +135,7 @@ test('clicking the app starts the service when it is not answering, then opens t
   assert.ok(calls.trim().endsWith('open [http://localhost:4317]'), 'the window opens once it answers');
 });
 
-test('if Majordomo cannot start, the app says why instead of opening a dead page', () => {
+test('if 00Dojo cannot start, the app says why instead of opening a dead page', () => {
   const { home, p } = sandbox();
   const s = stubs(home, 'false');
   fs.mkdirSync(path.dirname(p.log), { recursive: true });
@@ -149,6 +149,15 @@ test('if Majordomo cannot start, the app says why instead of opening a dead page
   assert.ok(calls.includes('osascript'), 'a message is shown');
   assert.ok(calls.includes('Files and Folders'), 'a blocked folder gets the fix for a blocked folder');
   assert.ok(calls.includes('EPERM: operation not permitted'), 'the log is quoted so it can be passed on');
+});
+
+test('an app whose service is gone tells the person exactly what to type', () => {
+  const { home, p } = sandbox();
+  const s = stubs(home, 'false');
+  assert.equal(runLauncher(p, home, s.bin, '1').status, 1);
+  const calls = s.read();
+  assert.ok(calls.includes('service is not installed'), calls);
+  assert.ok(calls.includes(`cd '${repo}'`) && calls.includes('npm run install-app'), 'the folder is spelled out, since it is not named after the app');
 });
 
 // ----- installing -----
@@ -174,14 +183,18 @@ function fakeMac(overrides: Sys = {}) {
 test('installing creates the app and the login service, and removing takes both away', async () => {
   const { home, p } = sandbox({ OPENROUTER_API_KEY: 'sk-or-secret' });
   const { sys, calls, said } = fakeMac();
+  // The app as it was installed under its first name.
+  const former = path.join(home, 'Applications', 'Majordomo.app');
+  fs.mkdirSync(path.join(former, 'Contents'), { recursive: true });
 
   const { app } = await mac.install(p, sys);
-  assert.equal(app, path.join(home, 'Applications', 'Majordomo.app'));
-  const launcher = path.join(app, 'Contents', 'MacOS', 'Majordomo');
+  assert.ok(!fs.existsSync(former), 'the app under its earlier name is cleared away, so there is one icon and not two');
+  assert.equal(app, path.join(home, 'Applications', '00Dojo.app'));
+  const launcher = path.join(app, 'Contents', 'MacOS', '00Dojo');
   assert.ok(fs.statSync(launcher).mode & 0o100, 'the launcher can be run');
   assert.equal(fs.readFileSync(launcher, 'utf8'), mac.launcherScript(p));
   assert.ok(fs.existsSync(path.join(app, 'Contents', 'Info.plist')));
-  assert.equal(fs.readFileSync(path.join(app, 'Contents', 'Resources', 'Majordomo.icns')).subarray(0, 4).toString(), 'icns');
+  assert.deepEqual(fs.readFileSync(path.join(app, 'Contents', 'Resources', '00Dojo.icns')), fs.readFileSync(path.join(repo, 'assets', '00Dojo.icns')), 'the built-in icon is used when no personal one is set');
   assert.equal(fs.readFileSync(p.plist, 'utf8'), mac.agentPlist(p));
 
   // An earlier copy is stopped before the new one is loaded.
@@ -202,7 +215,7 @@ test('installing refuses while a copy started by hand holds the port, and change
   const { home, p } = sandbox();
   const { sys } = fakeMac({ portInUse: async () => true });
   await assert.rejects(mac.install(p, sys), /already running[\s\S]*Control \+ C/);
-  assert.ok(!fs.existsSync(path.join(home, 'Applications', 'Majordomo.app')));
+  assert.ok(!fs.existsSync(path.join(home, 'Applications', '00Dojo.app')));
   assert.ok(!fs.existsSync(p.plist));
 });
 
@@ -219,7 +232,7 @@ test('a service that never answers is reported with its log', async () => {
 });
 
 test('the app icon is a well-formed icns with a full-size image', () => {
-  const icns = fs.readFileSync(path.join(repo, 'assets', 'Majordomo.icns'));
+  const icns = fs.readFileSync(path.join(repo, 'assets', '00Dojo.icns'));
   assert.equal(icns.subarray(0, 4).toString(), 'icns');
   assert.equal(icns.readUInt32BE(4), icns.length, 'the declared length matches the file');
   const types: string[] = [];

@@ -1,4 +1,8 @@
-# Majordomo
+# 00Dojo
+
+> 00Dojo was first called Majordomo. The app, the dashboard and the manager use the new name; the things you type
+> and the places on disk keep the old one, so nothing breaks: the repository and its folder, `bin/majordomo.mjs`,
+> the `MAJORDOMO_*` settings and the data folder `~/.majordomo`.
 
 A personal project manager that runs a crew of AI agents for you.
 
@@ -38,13 +42,13 @@ npm run demo
 
 ## Mac app
 
-On a Mac you can run Majordomo as an app instead of from a Terminal window:
+On a Mac you can run 00Dojo as an app instead of from a Terminal window:
 
 ```bash
 npm run install-app
 ```
 
-This adds **Majordomo** to your Applications folder and sets up a background service that starts when you log in.
+This adds **00Dojo** to your Applications folder and sets up a background service that starts when you log in.
 Clicking the app opens the dashboard in a window of its own (in Chrome, Edge, Brave, Chromium or Vivaldi if one is
 installed; otherwise in your default browser). Because the service is always running while you are logged in, the
 Telegram bot and reminders work without you starting anything.
@@ -57,8 +61,24 @@ Telegram bot and reminders work without you starting anything.
   once whether “node” may access that folder. Allow it.
 - API keys exported in your shell are not visible to the service. Paste them in **Settings → Accounts** instead.
 - The service writes its output to `~/.majordomo/logs/server.log`.
-- While the service is running, `npm start` reports that Majordomo is already running rather than starting a second
+- While the service is running, `npm start` reports that 00Dojo is already running rather than starting a second
   copy.
+
+### Your own icon
+
+The built-in icon is a bell. To use a picture of your own for the Mac app, the dashboard and the browser tab, give
+it to the installer:
+
+```bash
+npm run install-app ~/Downloads/my-icon.png
+```
+
+(On other systems, `npm run set-icon ~/Downloads/my-icon.png` sets it for the dashboard alone.)
+
+The picture is copied to `~/.majordomo/icon` and stays on your computer. It is never added to this repository, so
+it is not published with the code, and later runs of `npm run install-app` keep using it. It should be a square PNG,
+ideally 1024 × 1024, drawn the way macOS expects an app icon: the rounded tile fills 824 of the 1024 pixels, centred,
+with the rest transparent. `npm run set-icon -- --default` goes back to the bell.
 
 To remove the app and stop the service (your projects, settings and keys are kept):
 
@@ -88,7 +108,7 @@ curl -fsSL https://claude.ai/install.sh | bash
 ~/.local/bin/claude
 ```
 
-Choose your Claude account when it asks how to sign in, then restart Majordomo.
+Choose your Claude account when it asks how to sign in, then restart 00Dojo.
 
 **If another program already answers to `claude`** (a Hermes Agent profile named "claude" does, and its shortcut
 lives at that same `~/.local/bin/claude`), the installer cannot create its launcher and the command above opens
@@ -99,12 +119,12 @@ running it from there:
 "$(ls -t ~/.local/share/claude/versions/* | head -1)"
 ```
 
-Majordomo handles this by itself: it checks that what it finds really is Claude Code, looks in that versions
+00Dojo handles this by itself: it checks that what it finds really is Claude Code, looks in that versions
 folder as well as your `PATH`, and says so on the Accounts page if all it can find is the other program. Your
 other program's shortcut is left alone.
 
-**Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; Majordomo starts it
-headless with a task and turns its event stream into dashboard activity. Majordomo never sees or stores your
+**Subscriptions** work through each vendor's own command-line agent. The CLI holds your login; 00Dojo starts it
+headless with a task and turns its event stream into dashboard activity. 00Dojo never sees or stores your
 subscription credentials. Usage counts against your plan's limits, and each vendor's terms decide what automated use
 your plan allows — check them if you intend to run this heavily.
 
@@ -115,11 +135,11 @@ Press **Test** / **Check sign-in** on an account card to confirm it works before
 
 ## Message it from your phone
 
-Majordomo can be reached through a Telegram bot, so you can start a project, ask where things stand, or approve a
+00Dojo can be reached through a Telegram bot, so you can start a project, ask where things stand, or approve a
 command while you are away from the computer.
 
 1. In Telegram, open a chat with **@BotFather**, send `/newbot`, and follow the prompts. It gives you a token.
-2. In Majordomo, go to **Settings → Phone**, paste the token, and press **Connect**.
+2. In 00Dojo, go to **Settings → Phone**, paste the token, and press **Connect**.
 3. Open the pairing link shown there on any device signed in to your Telegram account and press **Start**.
 
 ![The Phone panel in Settings, linked and ready](docs/phone.png)
@@ -134,7 +154,7 @@ phone shows up in the dashboard, marked *sent from Telegram*.
 - `/status` shows who is working without involving the manager; `/stop` halts it mid-reply; `/unlink` disconnects
   the chat.
 
-The bot polls Telegram from your computer, so it needs no public address and answers only while Majordomo is
+The bot polls Telegram from your computer, so it needs no public address and answers only while 00Dojo is
 running. Only chats linked with the one-time pairing code can use it; anyone else who finds the bot gets a refusal
 and never reaches the manager. Text, voice notes, photos and files all work. Messages pass through Telegram's
 servers, as with any bot.
@@ -199,13 +219,13 @@ A draft waits in your Gmail Drafts folder until you send it yourself.
    Publish it ("In production") or Google will make you sign in again every week; you will see a one-time
    "unverified app" warning, which is expected for an app only you use.
 4. Under **Credentials**, create an **OAuth client ID** of type **Desktop app**.
-5. In Majordomo, go to **Settings → Email & calendar**, paste the client ID and secret, and press
+5. In 00Dojo, go to **Settings → Email & calendar**, paste the client ID and secret, and press
    **Connect Google account**.
 
 Two things worth knowing:
 
-- **"Draft only" is enforced by Majordomo, not by Google.** Google has no drafts-only permission: the one that
-  allows saving a draft also allows sending. Majordomo has no send tool, a single module talks to Gmail, and that
+- **"Draft only" is enforced by 00Dojo, not by Google.** Google has no drafts-only permission: the one that
+  allows saving a draft also allows sending. 00Dojo has no send tool, a single module talks to Gmail, and that
   module refuses the send endpoints outright. But the sign-in stored on your computer could technically send if
   other software used it, so treat `~/.majordomo/secrets.json` as you would a password.
 - **Mail is written by strangers.** Everything read from an email or calendar event is handed to the model fenced

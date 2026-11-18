@@ -95,5 +95,5 @@ test('with nothing installed it simply says so', async () => {
   fs.rmSync(path.join(home, '.local'), { recursive: true });
   settings.forgetCliProbe();
   const status = await claude();
-  assert.deepEqual([status.ready, status.detail], [false, 'Not installed, or not where Majordomo looks for it']);
+  assert.deepEqual([status.ready, status.detail], [false, 'Not installed, or not where 00Dojo looks for it']);
 });

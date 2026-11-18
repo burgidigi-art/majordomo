@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMessage, VoiceSettings } from '../shared/types.ts';
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
-import { events, memory, projects, reminders, tasks } from './db.ts';
+import { DATA_DIR, events, memory, projects, reminders, tasks } from './db.ts';
 import { disconnect as disconnectGoogle, finishSignIn, googleStatus, saveClient, startSignIn } from './google.ts';
 import { inboxFile, mimeOf } from './inbox.ts';
 import { describeError, listModels } from './llm/index.ts';
@@ -38,7 +38,7 @@ app.use('*', async (c, next) => {
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
-    if (!TOKEN) return c.text('Majordomo only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
+    if (!TOKEN) return c.text('00Dojo only accepts connections from this computer. Set MAJORDOMO_TOKEN to allow remote access.', 403);
     const given = url.searchParams.get('token') ?? c.req.header('authorization')?.replace(/^Bearer /, '') ?? cookie(c.req.header('cookie'), 'mj_token');
     if (given !== TOKEN) return c.text('Access token required.', 401);
     if (url.searchParams.has('token')) c.header('Set-Cookie', `mj_token=${TOKEN}; HttpOnly; SameSite=Strict; Path=/`);
@@ -69,8 +69,26 @@ app.onError((err, c) => c.json({ error: describeError(err) }, 400));
 
 // ---------- state + live stream ----------
 
-// A cheap check that this is Majordomo and that it is answering; the Mac app polls it while starting up.
+// A cheap check that this is 00Dojo and that it is answering; the Mac app polls it while starting up.
 app.get('/api/health', (c) => c.json({ ok: true, app: 'majordomo' }));
+
+// The mark shown in the sidebar and the browser tab. A personal icon set with `npm run set-icon` lives
+// in the data folder and wins over the built-in one. Icons are drawn with the margin macOS wants
+// around an app icon (the tile is 824 of 1024 across), so the picture is wrapped in an SVG that crops to the tile.
+const BUILT_IN_ICON = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets/icon.png');
+app.get('/api/brand.svg', async (c) => {
+  const personal = path.join(DATA_DIR, 'icon');
+  let png: Buffer | null = null;
+  for (const file of [path.join(personal, 'icon-256.png'), path.join(personal, 'icon.png'), BUILT_IN_ICON]) {
+    png = await fs.readFile(file).catch(() => null);
+    if (png) break;
+  }
+  if (!png) return c.text('No icon.', 404);
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">' +
+    `<image width="1024" height="1024" href="data:image/png;base64,${png.toString('base64')}"/></svg>`;
+  return c.body(svg, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache' });
+});
 
 app.get('/api/state', async (c) => c.json(await orch.state()));
 

@@ -222,7 +222,7 @@ export const RUNTIMES: RuntimeDef[] = [
     label: 'Claude · subscription',
     auth: 'Your Claude plan, through the Claude Code CLI',
     canManage: true,
-    setupHint: 'Install Claude Code (see the README), sign in once in a terminal with your Claude account, then restart Majordomo.',
+    setupHint: 'Install Claude Code (see the README), sign in once in a terminal with your Claude account, then restart 00Dojo.',
     defaultModel: '',
   },
   {
@@ -340,7 +340,7 @@ export async function runtimeStatus(): Promise<RuntimeInfo[]> {
             ? `Found ${found.version}${where}`
             : found.impostor
               ? `The \`${CLI[id].command}\` command on this computer is a different program (${found.impostor}), not ${CLI[id].product}.`
-              : 'Not installed, or not where Majordomo looks for it',
+              : 'Not installed, or not where 00Dojo looks for it',
           keySource: null,
         };
       }
