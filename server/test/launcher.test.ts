@@ -41,3 +41,23 @@ test('the launcher rebuilds the dashboard only when its source is newer than the
   write('server/index.ts', now + 40);
   assert.equal(buildReason(root), null);
 });
+
+test('an update that adds a package is noticed, so the installer can fetch it', async () => {
+  const { dependenciesOutOfDate } = (await import(helper)) as { dependenciesOutOfDate: (root: string) => boolean };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'majordomo-deps-'));
+  const write = (rel: string, at: number) => {
+    const file = path.join(root, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}');
+    fs.utimesSync(file, at, at);
+  };
+  const now = Math.floor(Date.now() / 1000);
+  assert.equal(dependenciesOutOfDate(root), false, 'a checkout with no lock file has nothing to compare');
+  write('package-lock.json', now - 100);
+  assert.equal(dependenciesOutOfDate(root), true, 'nothing installed yet');
+  write('node_modules/.package-lock.json', now - 50);
+  assert.equal(dependenciesOutOfDate(root), false);
+  // What a `git pull` that adds a dependency does.
+  write('package-lock.json', now);
+  assert.equal(dependenciesOutOfDate(root), true);
+});

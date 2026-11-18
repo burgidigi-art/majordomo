@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // `npm run install-app` and `npm run uninstall-app`: the Mac app and its background service.
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dependenciesOutOfDate } from './build-check.mjs';
 import { setIcon } from './icon.mjs';
 import { install, plan, uninstall } from './mac-app.mjs';
 
@@ -14,6 +17,14 @@ if (process.platform !== 'darwin') {
 }
 
 try {
+  // An update can add packages. Fetch them here, where there is a Terminal to show what happens,
+  // rather than leave the background service to start without them.
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  if (!remove && dependenciesOutOfDate(root)) {
+    console.log('\n  This version needs packages that are not installed yet. Running npm install…\n');
+    const installed = spawnSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: root, stdio: 'inherit' });
+    if (installed.status !== 0) throw new Error('npm install did not finish. Fix what it reported above, then run this again.');
+  }
   if (picture && !remove) {
     const saved = setIcon(picture);
     console.log(`\n  Using your picture as the icon. It is kept in ${saved.folder}, on this computer only.`);

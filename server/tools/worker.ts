@@ -4,12 +4,22 @@ import net from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
 import { fileSize, isVisionImage, mimeOf, VISION_MAX_BYTES } from '../inbox.ts';
-import { clip, defineTool, ToolError, type Tool } from './tool.ts';
+import { mayRead, refusal, SandboxError, wrap, type SandboxPolicy } from '../sandbox.ts';
+import { clip, defineTool, ToolError, type Tool, type ToolCtx } from './tool.ts';
 
 // ---------- path handling ----------
 
 function resolvePath(cwd: string, p: string): string {
   return path.resolve(cwd, p.startsWith('~/') ? path.join(process.env.HOME ?? '', p.slice(2)) : p);
+}
+
+/** Where a read may go. A sandboxed agent is held to its project, its skills and the system's own files. */
+function resolveForRead(ctx: ToolCtx, p: string): string {
+  const file = resolvePath(ctx.cwd, p);
+  if (ctx.sandbox && !mayRead(ctx.sandbox, file)) {
+    throw new ToolError(`"${p}" is outside this project. The sandbox keeps you to the project workspace (${ctx.sandbox.workspace}); ask your manager if the task needs something from elsewhere.`);
+  }
+  return file;
 }
 
 /** Writes stay inside the workspace. Symlinked parents are resolved before the check. */
@@ -37,10 +47,12 @@ async function resolveForWrite(cwd: string, p: string): Promise<string> {
 
 // ---------- shell ----------
 
-export function runShell(
+export async function runShell(
   command: string,
-  opts: { cwd: string; timeoutMs: number; signal: AbortSignal },
+  opts: { cwd: string; timeoutMs: number; signal: AbortSignal; sandbox?: SandboxPolicy },
 ): Promise<{ output: string; code: number | null; timedOut: boolean }> {
+  // Sandboxed, the command becomes one that starts inside the sandbox. If that cannot be done it is not run.
+  if (opts.sandbox) command = await wrap(command, opts.sandbox);
   return new Promise((resolve) => {
     const child = spawn('bash', ['-c', command], {
       cwd: opts.cwd,
@@ -96,11 +108,13 @@ const bash = defineTool({
   async run({ command, timeout_seconds }, ctx) {
     const ok = await ctx.host.approve(ctx.agentId, 'bash', command.split('\n')[0].slice(0, 140), command, ctx.signal);
     if (!ok) return 'The user declined this command. Do not retry it; find another way or explain what you need.';
-    const res = await runShell(command, {
-      cwd: ctx.cwd,
-      timeoutMs: (timeout_seconds ?? 120) * 1000,
-      signal: ctx.signal,
-    });
+    let res: Awaited<ReturnType<typeof runShell>>;
+    try {
+      res = await runShell(command, { cwd: ctx.cwd, timeoutMs: (timeout_seconds ?? 120) * 1000, signal: ctx.signal, sandbox: ctx.sandbox });
+    } catch (err) {
+      if (err instanceof SandboxError) throw new ToolError(refusal(err));
+      throw err;
+    }
     const tail = res.timedOut
       ? `\n[timed out after ${timeout_seconds ?? 120}s and was killed]`
       : res.code === 0
@@ -121,7 +135,7 @@ const readFile = defineTool({
     limit: z.number().int().min(1).optional().describe('Maximum number of lines. Default 800.'),
   }),
   async run({ path: p, offset, limit }, ctx) {
-    const file = resolvePath(ctx.cwd, p);
+    const file = resolveForRead(ctx, p);
     const stat = await fs.stat(file).catch(() => null);
     if (!stat) throw new ToolError(`No such file: ${p}`);
     if (stat.isDirectory()) throw new ToolError(`${p} is a directory. Use list_files.`);
@@ -199,7 +213,7 @@ const listFiles = defineTool({
     depth: z.number().int().min(1).max(6).optional().describe('How many levels deep. Default 2.'),
   }),
   async run({ path: p, depth }, ctx) {
-    const dir = resolvePath(ctx.cwd, p ?? '.');
+    const dir = resolveForRead(ctx, p ?? '.');
     const out: string[] = [];
     await walk(dir, dir, depth ?? 2, out, 400);
     if (!out.length) return '(empty)';
@@ -221,8 +235,13 @@ const searchFiles = defineTool({
     const cmd =
       `if command -v rg >/dev/null 2>&1; then rg -n --no-heading -S --max-columns 300 ${glob ? `-g ${q(glob)}` : ''} -e ${q(pattern)} ${where} | head -200; ` +
       `else grep -rnIE ${glob ? `--include=${q(glob)}` : ''} --exclude-dir=node_modules --exclude-dir=.git -e ${q(pattern)} ${where} | head -200; fi`;
-    const res = await runShell(cmd, { cwd: ctx.cwd, timeoutMs: 30_000, signal: ctx.signal });
-    return clip(res.output.trimEnd() || 'No matches.');
+    try {
+      const res = await runShell(cmd, { cwd: ctx.cwd, timeoutMs: 30_000, signal: ctx.signal, sandbox: ctx.sandbox });
+      return clip(res.output.trimEnd() || 'No matches.');
+    } catch (err) {
+      if (err instanceof SandboxError) throw new ToolError(refusal(err));
+      throw err;
+    }
   },
 });
 
@@ -233,7 +252,7 @@ const viewImage = defineTool({
     'The image is shown to you in the result. Paths are relative to the project workspace; absolute paths also work.',
   input: z.object({ path: z.string() }),
   async run({ path: p }, ctx) {
-    const file = resolvePath(ctx.cwd, p);
+    const file = resolveForRead(ctx, p);
     const stat = await fs.stat(file).catch(() => null);
     if (!stat?.isFile()) throw new ToolError(`No such file: ${p}`);
     const mime = mimeOf(file);

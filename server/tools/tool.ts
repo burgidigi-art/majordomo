@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ImageRef, ToolDef } from '../llm/types.ts';
+import type { SandboxPolicy } from '../sandbox.ts';
 
 /** What a tool hands back: text, optionally with images for the model to look at. */
 export type ToolOutput = string | { text: string; images: ImageRef[] };
@@ -22,6 +23,8 @@ export interface ToolCtx {
   cwd: string;
   signal: AbortSignal;
   host: Host;
+  /** Set when the agent is sandboxed: what it may read and where its commands may write. */
+  sandbox?: SandboxPolicy;
 }
 
 export interface Tool<T = any> {

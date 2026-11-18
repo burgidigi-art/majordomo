@@ -1,6 +1,6 @@
-import { Check, Copy, Loader2, Lock, LockOpen, Mail, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Lock, LockOpen, Mail, Plus, ShieldCheck, Smartphone, Star, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
+import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, SandboxCheck, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
 import { crewCleared } from '../../../shared/privacy.ts';
 import { api } from '../api.ts';
 import { browserVoices, say, setVoicePrefs, stopSpeaking, useSpeaker, type VoicePrefs } from '../speaker.ts';
@@ -192,6 +192,101 @@ function AccountCard({ rt, isPm }: { rt: RuntimeInfo; isPm: boolean }) {
       )}
 
       {result && <div className={`msg ${result.ok ? 'ok' : 'bad'}`}>{result.message}</div>}
+    </div>
+  );
+}
+
+// ---------- sandbox ----------
+
+/** The sandbox switch, and a way to try the sandbox for real on this computer. */
+function Sandbox({ on, saved, onChange }: { on: boolean; saved: boolean; onChange: (on: boolean) => void }) {
+  const [check, setCheck] = useState<SandboxCheck | null>(null);
+  const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api
+      .sandbox()
+      .then((s) => {
+        setCheck(s.check);
+        setUnavailable(s.unavailable);
+      })
+      .catch(() => undefined);
+  }, []);
+  const run = async () => {
+    setBusy(true);
+    const result = await attempt(() => api.checkSandbox());
+    if (result) setCheck(result);
+    setBusy(false);
+  };
+  const broken = unavailable ?? (check && !check.ok ? check.problem || 'Some of the checks below failed.' : null);
+  const state = !saved ? 'Off' : broken ? 'Not working' : check?.ok ? 'Working' : 'Not checked yet';
+  return (
+    <div className="card" style={{ padding: 16, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="acct-top">
+        <span className="avatar fam-claude">
+          <ShieldCheck size={15} />
+        </span>
+        <div className="grow">
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Sandbox</h3>
+          <div className="hint">Keeps each agent inside its own project folder.</div>
+        </div>
+        <span className={`pill ${state === 'Working' ? 'done' : state === 'Not working' ? 'failed' : ''}`}>
+          <span className="dot" />
+          {state}
+        </span>
+      </div>
+      <label className="switch">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+        <span>
+          Keep agents inside their project folder
+          <div className="hint">
+            An agent can read and change its own project’s files, read its skills and the programs installed on this computer, and use the internet.
+            The rest of your home folder is closed to it: your documents, other projects, saved keys and passwords. If the sandbox cannot start,
+            agents’ commands are refused, never run outside it.
+          </div>
+        </span>
+      </label>
+      {saved && broken && (
+        <div className="callout bad">
+          The sandbox is on but is not working on this computer, so agents’ commands are being refused. {broken} You can switch it off above to let
+          agents run without it.
+        </div>
+      )}
+      <ul className="steps-list" style={{ listStyle: 'disc' }}>
+        <li>Agents on an API key (OpenRouter, and the others): fully held in, files and commands alike.</li>
+        <li>
+          Claude Code agents: held in by Claude Code’s own sandbox. Their shell commands can also reach only package and code sites (npm, PyPI,
+          GitHub and similar); their web search and page reading are not limited.
+        </li>
+        <li>Codex agents use Codex’s own sandbox, set below. Gemini CLI agents and your manager are not sandboxed.</li>
+      </ul>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <button className="btn sm" disabled={busy} onClick={() => void run()}>
+          {busy ? <Loader2 size={13} className="spin" /> : <Check size={13} />}
+          Check the sandbox
+        </button>
+        <span className="hint">
+          {check ? `Last checked ${new Date(check.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : 'Runs a few harmless commands through it to prove it holds.'}
+        </span>
+      </div>
+      {check && check.probes.length > 0 && (
+        <div>
+          {check.probes.map((p) => (
+            <div key={p.name} className="list-row" style={{ padding: '5px 0', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ color: p.ok ? 'var(--ok, #2e8b57)' : p.required ? 'var(--attn)' : 'var(--text-3)', flex: 'none' }}>{p.ok ? <Check size={13} /> : <X size={13} />}</span>
+              <span className="grow">
+                {p.name}
+                {!p.ok && (
+                  <div className="hint mono" style={{ overflowWrap: 'anywhere' }}>
+                    {p.required ? '' : 'Not required, but agents may need it. '}
+                    {p.detail || '(no output)'}
+                  </div>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -931,6 +1026,7 @@ export function Settings({ section }: { section?: string }) {
         <section className="section" id="agents">
           <h2>How agents work</h2>
           <p>Agents run on this computer, inside each project’s workspace folder.</p>
+          <Sandbox on={draft.sandbox !== false} saved={app.settings.sandbox !== false} onChange={(sandbox) => patch({ sandbox })} />
           <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="grid-3">
               <div className="field">
@@ -951,7 +1047,9 @@ export function Settings({ section }: { section?: string }) {
             </div>
             <div className="hint">
               {draft.approvalMode === 'auto'
-                ? 'Agents on an API key run shell commands freely. File edits are limited to the project workspace, but a shell command can reach anything your user account can — use “ask” if that worries you.'
+                ? draft.sandbox !== false
+                  ? 'Agents on an API key run shell commands without asking. The sandbox below keeps those commands to the project folder.'
+                  : 'Agents on an API key run shell commands freely. File edits are limited to the project workspace, but with the sandbox off a shell command can reach anything your user account can — switch the sandbox on, or use “ask”.'
                 : 'Agents on an API key pause and show you each shell command first. CLI agents (Claude Code, Codex, Gemini CLI) cannot ask through this dashboard, so in this mode they are limited to reading and editing files.'}
             </div>
             <div className="grid-3">

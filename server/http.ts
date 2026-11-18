@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CrewProfile, FileEntry, ModelOption, RuntimeId, Settings, StreamMessage, VoiceSettings } from '../shared/types.ts';
+import { checkSandbox, lastSandboxCheck, sandboxKind, sandboxOn, unavailableReason } from './sandbox.ts';
 import { runCliTurn } from './agents/cli.ts';
 import { emit, subscribe, sync } from './bus.ts';
 import { DATA_DIR, events, memory, projects, reminders, tasks } from './db.ts';
@@ -150,6 +151,12 @@ app.post('/api/pm/reset', (c) => {
   orch.resetPm();
   return c.json({ ok: true });
 });
+
+// ---------- the sandbox ----------
+
+app.get('/api/sandbox', (c) => c.json({ on: sandboxOn(), kind: sandboxKind(), unavailable: unavailableReason(), check: lastSandboxCheck() }));
+// Tries it for real on this computer. Slow enough (a few seconds) that it is only done when asked, and once at start.
+app.post('/api/sandbox/check', async (c) => c.json(await checkSandbox()));
 
 // ---------- projects and tasks ----------
 

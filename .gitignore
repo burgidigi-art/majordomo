@@ -2,3 +2,4 @@ node_modules
 web/dist
 *.log
 .DS_Store
+.sandbox-test-*

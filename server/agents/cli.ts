@@ -1,3 +1,4 @@
+import { claudeCodeSettings, type SandboxPolicy } from '../sandbox.ts';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -33,6 +34,8 @@ export interface CliTurn {
   manager: boolean;
   /** Folders outside the workspace a worker may read: where its skills live. */
   readDirs?: string[];
+  /** Set when the worker is held to its project folder. */
+  sandbox?: SandboxPolicy;
   /** Usage as it happens, one model call at a time, for CLIs that report it that way (Claude Code). */
   onUsage?: (usage: Usage, model: string) => void;
   signal: AbortSignal;
@@ -139,6 +142,8 @@ const claude: Driver = {
       const own = ask ? 'Read,Glob,Grep,WebFetch,WebSearch,Skill' : 'Bash,Read,Glob,Grep,WebFetch,WebSearch,Skill';
       args.push('--allowedTools', turn.mcp ? `${own},mcp__majordomo` : own);
       for (const dir of turn.readDirs ?? []) args.push('--add-dir', dir);
+      // Claude Code's own sandbox, set for this session: its shell and its file tools keep to the project.
+      if (turn.sandbox) args.push('--settings', JSON.stringify(claudeCodeSettings(turn.sandbox)));
     }
     if (turn.mcp) {
       const config = {

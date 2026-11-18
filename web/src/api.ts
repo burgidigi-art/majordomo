@@ -1,4 +1,4 @@
-import type { AgentEvent, AlertSettings, AppState, PluginServer, Skill, SkillRepo, TrendingState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
+import type { SandboxCheck, AgentEvent, AlertSettings, AppState, PluginServer, Skill, SkillRepo, TrendingState, FileEntry, GoogleStatus, ModelOption, Project, RuntimeId, Settings, TelegramStatus, VoiceSettings } from '../../shared/types.ts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -41,6 +41,8 @@ export const api = {
   chat: (text: string) => post('/api/chat', { text }),
   stopPm: () => post('/api/pm/stop'),
   resetPm: () => post('/api/pm/reset'),
+  sandbox: () => request<{ on: boolean; kind: SandboxCheck['kind']; unavailable: string | null; check: SandboxCheck | null }>('/api/sandbox'),
+  checkSandbox: () => post<SandboxCheck>('/api/sandbox/check'),
 
   createProject: (body: { name: string; goal?: string; workspacePath?: string; private?: boolean }) => post<Project>('/api/projects', body),
   updateProject: (id: string, patch: Partial<Project>) =>

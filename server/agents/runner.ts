@@ -1,3 +1,4 @@
+import type { SandboxPolicy } from '../sandbox.ts';
 import type { Attachment, Effort, RuntimeId } from '../../shared/types.ts';
 import { emit, emitDelta } from '../bus.ts';
 import { kvDelete, kvGet, kvSet, messages } from '../db.ts';
@@ -44,6 +45,8 @@ export interface AgentSpec {
   /** Folders outside the workspace the agent may read (where its skills are). */
   readDirs?: string[];
   mcp?: { url: string; token: string };
+  /** Set when the agent is held to its project folder. */
+  sandbox?: SandboxPolicy;
 }
 
 export interface Outcome {
@@ -170,6 +173,7 @@ export class Runner {
       mcp: spec.mcp,
       manager: spec.manager,
       readDirs: spec.readDirs,
+      sandbox: spec.sandbox,
       // Claude Code reports each model call as it happens; count it then, not only at the end.
       onUsage: (usage, model) => {
         this.hooks.onUsage(spec.id, usage, 0, true);
@@ -320,7 +324,7 @@ export class Runner {
       return fail(`Invalid input for ${call.name} — ${issues}. The tool was not run.`);
     }
     try {
-      const out = await tool.run(parsed.data, { agentId: spec.id, cwd: spec.cwd, signal, host: this.hooks.host });
+      const out = await tool.run(parsed.data, { agentId: spec.id, cwd: spec.cwd, signal, host: this.hooks.host, sandbox: spec.sandbox });
       return typeof out === 'string'
         ? { type: 'tool_result', id: call.id, name: call.name, output: out }
         : { type: 'tool_result', id: call.id, name: call.name, output: out.text, images: out.images };

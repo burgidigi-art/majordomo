@@ -7,6 +7,7 @@ import { orch, runner, setBaseUrl } from './orchestrator.ts';
 import { telegram } from './gateways/telegram.ts';
 import { closeAllPlugins } from './plugins.ts';
 import { scheduleTrending } from './trending.ts';
+import { checkSandbox, sandboxOn } from './sandbox.ts';
 import { DEMO, getSettings } from './settings.ts';
 
 const port = Number(process.env.MAJORDOMO_PORT || process.env.PORT || 4317);
@@ -29,6 +30,13 @@ setPluginRedirectBase(`http://localhost:${port}`);
 // in the background), so nothing is touched until the port is ours.
 const server = serve({ fetch: app.fetch, port, hostname }, () => {
   orch.boot();
+  // Try the sandbox once, so the log says whether agents are being held to their project folders.
+  if (sandboxOn()) {
+    void checkSandbox().then((check) => {
+      const failed = check.probes.filter((p) => p.required && !p.ok).map((p) => p.name);
+      console.log(check.ok ? `  Sandbox: working (${check.kind})` : `  Sandbox: NOT working. ${check.problem || `Failed: ${failed.join('; ')}`}. Agents’ commands are refused until this is fixed or the sandbox is switched off in Settings.`);
+    });
+  }
   // What's hot on GitHub: now, and every day at 12:01 am.
   if (!process.env.MAJORDOMO_NO_TRENDING) scheduleTrending();
   const s = getSettings();

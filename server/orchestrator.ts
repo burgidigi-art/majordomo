@@ -21,6 +21,7 @@ import { approvals, DATA_DIR, events, kvGet, kvSet, memory, messages, nextId, pr
 import type { Usage } from './llm/types.ts';
 import { DEMO, getSettings, resolveCrew, runtimeDef, runtimeStatus } from './settings.ts';
 import { cleared, clearedCrew, clearedNames, crewOf, isPrivate, managerHoldsMail, setManagerHoldsMail, taskCleared, watched, workerToken } from './privacy.ts';
+import { checkSandbox, policyFor, sandboxOn } from './sandbox.ts';
 import { pmTools, projectSummary, type Orch } from './tools/pm.ts';
 import { clip, ToolError, type Host, type Tool } from './tools/tool.ts';
 import { workerTools } from './tools/worker.ts';
@@ -436,6 +437,8 @@ function specFor(id: string): AgentSpec {
   fs.mkdirSync(project.workspace, { recursive: true });
   // Email and calendar go only to crew cleared for private work.
   const mailbox = taskCleared(t);
+  // With the sandbox on, the agent is held to this project's folder.
+  const sandbox = sandboxOn() ? policyFor(project, skillFolders()) : undefined;
   return {
     id: t.id,
     manager: false,
@@ -443,15 +446,16 @@ function specFor(id: string): AgentSpec {
     model: t.model,
     effort: t.effort,
     cwd: project.workspace,
-    system: workerSystem({ crewName: t.crewName, cwd: project.workspace, helper: !!t.parentId }),
+    system: workerSystem({ crewName: t.crewName, cwd: project.workspace, helper: !!t.parentId, sandboxed: !!sandbox }),
     tools: [...workerTools({ canDelegate: !t.parentId }), ...(mailbox ? mailboxTools() : []), ...(enabledPluginNames().length ? pluginTools() : [])],
     // Agents on a CLI account bring their own tools; email, calendar and plugin tools reach them over MCP.
     mcp:
       runtimeDef(t.runtime).kind === 'cli' && ((mailbox && googleConnected()) || enabledPluginNames().length)
         ? { url: `${baseUrl}/mcp/worker/${encodeURIComponent(t.id)}`, token: workerToken(MCP_TOKEN, t.id) }
         : undefined,
-    cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace }),
+    cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace, sandboxed: !!sandbox }),
     readDirs: skillFolders(),
+    sandbox,
   };
 }
 

@@ -7,6 +7,8 @@ import path from 'node:path';
 export function tempHome(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'majordomo-test-'));
   process.env.MAJORDOMO_HOME = dir;
+  // Tests of other things must not depend on this computer having a working sandbox; the sandbox has its own tests.
+  process.env.MAJORDOMO_SANDBOX ??= 'off';
   return dir;
 }
 

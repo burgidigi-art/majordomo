@@ -20,7 +20,7 @@ and OpenRouter**, in any mix.
 
 ## Quick start
 
-Requires Node 20.11+ on macOS, Linux or WSL (agents use `bash`).
+Requires Node 20.11+ on macOS, Linux or WSL (agents use `bash`). The [sandbox](#sandbox) needs Node 22.12+.
 
 ```bash
 npm install
@@ -378,19 +378,62 @@ What is not:
 
 - **The manager retelling something later.** In a later turn it could put something it read earlier into a brief for
   crew who are not cleared. It is told not to; nothing can check a paraphrase.
-- **Files on your disk.** Shell commands are not sandboxed (see below), so an agent can read files outside its own
-  project if it goes looking.
+- **Files on your disk, if you switch the sandbox off.** With the sandbox on (it is by default; see below) an agent
+  cannot read outside its own project. Off, a shell command can reach whatever your account can.
 - **Plugins.** Any crew member can use the plugin tools you have switched on.
 - **What each company does with what it receives.** That is set in your account with each of them: check the privacy
   settings for your Claude, OpenAI, Google and OpenRouter accounts. OpenRouter can be told to avoid hosts that train
   on what you send.
 
+## Sandbox
+
+Each agent is held to its own project folder by the operating system, not by asking it to behave. It is on by default
+(**Settings → How agents work → Sandbox**).
+
+An agent **can**:
+
+- read and change the files in its own project's workspace, and use a scratch folder for temporary files;
+- read, but not change, its skills and the programs installed on the computer (node, python, git and so on, including
+  ones kept under your home folder by tools like nvm or pyenv);
+- use the internet.
+
+It **cannot**:
+
+- read anything else in your home folder: your documents, other projects, 00Dojo's own data and saved keys, SSH and
+  cloud credentials, browser profiles;
+- write anywhere outside its workspace and scratch folder.
+
+**If the sandbox is on and cannot start, agents' commands are refused.** Nothing is quietly run outside it. The
+**Check the sandbox** button in Settings tries it for real on your computer, running commands that should work and
+ones that must not, and shows what happened; the same check runs once when 00Dojo starts and is written to the log.
+
+How each kind of agent is held:
+
+| Agent | How |
+| --- | --- |
+| On an API key (OpenRouter, Anthropic, OpenAI, Gemini, Muse) | Commands run through [Anthropic's sandbox runtime](https://github.com/anthropics/sandbox-runtime): Seatbelt on macOS, bubblewrap on Linux. File tools are checked against the same rules. |
+| Claude Code | Claude Code's own sandbox, switched on for the session with the same rules, plus its settings that keep its file tools to the workspace. Needs Claude Code 2.1.319 or newer. |
+| Codex | Codex's own sandbox (**Codex CLI sandbox** in Settings; workspace-only by default). |
+| Gemini CLI, and the manager | Not sandboxed. The manager has no shell and cannot change files. |
+
+Things to know:
+
+- **Claude Code's sandbox also limits the network** for shell commands, to package registries and code hosts (npm,
+  PyPI, GitHub and similar). Its web search and page reading are not limited. Commands from agents on API keys can
+  reach any site.
+- It needs **Node 22.12 or newer**, and on Linux `bubblewrap` (`sudo apt-get install bubblewrap`). macOS needs
+  nothing extra.
+- A project whose workspace is an existing folder (a repository, a documents folder) gives its agents that whole
+  folder.
+- `MAJORDOMO_SANDBOX=off` switches it off whatever Settings says.
+
 ## Safety
 
 Agents run commands on your computer. Know what the guard rails are and are not:
 
-- Worker file edits are confined to the project workspace. **Shell commands are not sandboxed** — a command can reach
-  whatever your user account can. Set **Settings → Shell commands → Ask me before each command** to approve each one.
+- **Agents are sandboxed to their project folder** (see [Sandbox](#sandbox)). With the sandbox switched off, worker
+  file edits are still confined to the workspace but a shell command can reach whatever your user account can; set
+  **Settings → Shell commands → Ask me before each command** to approve each one.
 - That approval prompt covers agents on API keys. CLI agents cannot ask through the dashboard, so in "ask" mode they
   are limited to reading and editing files. Codex additionally runs in its own workspace sandbox by default.
 - The server listens on `127.0.0.1` only and refuses requests from other sites or hostnames. To reach it from another

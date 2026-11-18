@@ -61,6 +61,8 @@ export interface Settings {
   compactAtTokens: number;
   workspaceRoot: string;
   codexSandbox: 'workspace-write' | 'danger-full-access';
+  /** Keep each agent to its own project folder. On unless set to false. */
+  sandbox?: boolean;
 }
 
 export type ProjectStatus = 'active' | 'paused' | 'done' | 'archived';
@@ -386,4 +388,23 @@ export interface FileEntry {
   dir: boolean;
   size: number;
   mtime: number;
+}
+
+/** One thing tried when checking the sandbox on this computer. */
+export interface SandboxProbe {
+  name: string;
+  /** A failed required probe means agents are not held in; the others say what may not work inside. */
+  required: boolean;
+  ok: boolean;
+  detail: string;
+}
+
+/** The result of trying the sandbox for real. */
+export interface SandboxCheck {
+  at: number;
+  kind: 'seatbelt' | 'bubblewrap' | null;
+  ok: boolean;
+  /** Why it could not be tried at all, when that is the case. */
+  problem: string;
+  probes: SandboxProbe[];
 }

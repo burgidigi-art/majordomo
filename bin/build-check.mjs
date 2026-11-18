@@ -28,3 +28,16 @@ export function buildReason(root) {
   const changed = INPUTS.some((input) => newest(path.join(root, input)) > builtAt);
   return changed ? 'the source has changed since the last build' : null;
 }
+
+/**
+ * True when the installed packages are older than the list of what should be installed, which is
+ * what an update that adds a dependency leaves behind. npm records each install by rewriting
+ * node_modules/.package-lock.json.
+ */
+export function dependenciesOutOfDate(root) {
+  const wanted = path.join(root, 'package-lock.json');
+  const installed = path.join(root, 'node_modules', '.package-lock.json');
+  if (!existsSync(wanted)) return false;
+  if (!existsSync(installed)) return true;
+  return statSync(wanted).mtimeMs > statSync(installed).mtimeMs;
+}
