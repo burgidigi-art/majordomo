@@ -42,6 +42,11 @@ export interface CrewProfile {
   /** Empty string means "the runtime's default model". */
   model: string;
   effort?: Effort | null;
+  /**
+   * May handle private work: tasks in private projects, and the user's email and calendar.
+   * Unset means yes only when it is on the same company's models as the manager (see shared/privacy.ts).
+   */
+  trusted?: boolean;
 }
 
 export interface Settings {
@@ -69,6 +74,8 @@ export interface Project {
   notes: string;
   workspace: string;
   hue: number;
+  /** Private: its tasks only ever run on crew members cleared for private work. */
+  private: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -105,6 +112,8 @@ export interface Task {
   costUsd: number;
   /** True when usage is covered by a subscription/CLI login rather than metered per token. */
   costIncluded: boolean;
+  /** Must stay with cleared crew: it is in a private project, or its agent has read the user's email or calendar. */
+  private: boolean;
   createdAt: number;
   startedAt: number | null;
   finishedAt: number | null;

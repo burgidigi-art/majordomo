@@ -351,6 +351,40 @@ files you send in, and one workspace folder per project. A project can instead p
 
 Dark and light themes are both included; the switch is in the top bar.
 
+## Private work
+
+00Dojo keeps your projects, keys and files on your computer, but whatever an agent reads is **sent to the company
+that runs its model**, under that company's terms. With a mixed crew that can be several companies. Two controls
+decide who gets what.
+
+**Each crew member is either cleared for private work or not** (**Settings → Crew**, the *Private* button). It starts
+as yes for crew on the same company's models as your manager, which already sees everything, and no for everyone else.
+
+**A project can be private** (the *Private* button on its page, the tick box when you create one, or ask the manager
+to make it so). The manager also makes a project private by itself when it is plainly sensitive.
+
+What is enforced, by the program rather than by instruction:
+
+- A task in a private project only ever runs on cleared crew, helpers included. This is checked when the task is
+  written and again at the moment it starts, so withdrawing a clearance or removing a crew member takes effect.
+- Making a project private stops any of its tasks that are with crew who are not cleared.
+- The manager can make a project private. Only you can open one up again, from the dashboard.
+- Only cleared crew are given the email and calendar tools.
+- A task whose agent has opened your mailbox is private from then on, so its helpers must be cleared too.
+- In a turn where the manager has opened your mailbox, it cannot create a task for, or message, anyone who is not
+  cleared.
+
+What is not:
+
+- **The manager retelling something later.** In a later turn it could put something it read earlier into a brief for
+  crew who are not cleared. It is told not to; nothing can check a paraphrase.
+- **Files on your disk.** Shell commands are not sandboxed (see below), so an agent can read files outside its own
+  project if it goes looking.
+- **Plugins.** Any crew member can use the plugin tools you have switched on.
+- **What each company does with what it receives.** That is set in your account with each of them: check the privacy
+  settings for your Claude, OpenAI, Google and OpenRouter accounts. OpenRouter can be told to avoid hosts that train
+  on what you send.
+
 ## Safety
 
 Agents run commands on your computer. Know what the guard rails are and are not:

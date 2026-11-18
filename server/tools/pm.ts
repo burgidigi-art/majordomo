@@ -4,13 +4,14 @@ import { z } from 'zod';
 import type { Project, Reminder, Task } from '../../shared/types.ts';
 import { events, memory, projects, reminders, tasks } from '../db.ts';
 import { fileSize, inboxFile } from '../inbox.ts';
+import { cleared } from '../privacy.ts';
 import { getSettings } from '../settings.ts';
 import { clip, defineTool, ToolError, type Tool } from './tool.ts';
 import { walk, webFetch } from './worker.ts';
 
 /** What the PM's tools need from the orchestrator. */
 export interface Orch {
-  createProject(input: { name: string; goal: string; workspacePath?: string }): Promise<Project>;
+  createProject(input: { name: string; goal: string; workspacePath?: string; private?: boolean }): Promise<Project>;
   updateProject(id: string, patch: Partial<Project>): Project;
   createTasks(
     projectId: string,
@@ -71,7 +72,7 @@ export function projectSummary(p: Project): string {
     count('failed') + count('interrupted') && `${count('failed') + count('interrupted')} failed`,
     count('done') && `${count('done')} done`,
   ].filter(Boolean);
-  return `${p.id} "${p.name}" (${p.status})${bits.length ? `: ${bits.join(', ')}` : ': no tasks yet'}`;
+  return `${p.id} "${p.name}" (${p.status}${p.private ? ', private' : ''})${bits.length ? `: ${bits.join(', ')}` : ': no tasks yet'}`;
 }
 
 export function pmTools(orch: Orch): Tool[] {
@@ -94,7 +95,7 @@ export function pmTools(orch: Orch): Tool[] {
       const list = tasks.byProject(p.id);
       const lines = list.map((t) => `${t.parentId ? '    ↳ ' : '  '}${taskLine(t)}`);
       return [
-        `${p.id} "${p.name}" — ${p.status}`,
+        `${p.id} "${p.name}" — ${p.status}${p.private ? ' — private: only crew cleared for private work may be assigned' : ''}`,
         `Goal: ${p.goal || '(none recorded)'}`,
         `Workspace: ${p.workspace}`,
         `Notes: ${p.notes || '(none)'}`,
@@ -108,15 +109,17 @@ export function pmTools(orch: Orch): Tool[] {
     name: 'create_project',
     description:
       'Start tracking a new project. Each project gets its own workspace folder that its agents work in. ' +
-      'Pass workspace_path only when the user wants agents to work in an existing folder (a repo, a documents folder).',
+      'Pass workspace_path only when the user wants agents to work in an existing folder (a repo, a documents folder). ' +
+      'Set private for anything sensitive (health, money, legal, family, confidential work): its tasks then only ever run on crew cleared for private work.',
     input: z.object({
       name: z.string().min(1).max(80),
       goal: z.string().describe('What done looks like, in the user’s terms.'),
       workspace_path: z.string().optional(),
+      private: z.boolean().optional().describe('True keeps this project’s work with crew cleared for private work.'),
     }),
-    async run({ name, goal, workspace_path }) {
-      const p = await orch.createProject({ name, goal, workspacePath: workspace_path });
-      return `Created ${p.id} "${p.name}". Workspace: ${p.workspace}`;
+    async run({ name, goal, workspace_path, private: confidential }) {
+      const p = await orch.createProject({ name, goal, workspacePath: workspace_path, private: confidential });
+      return `Created ${p.id} "${p.name}"${p.private ? ' (private)' : ''}. Workspace: ${p.workspace}`;
     },
   });
 
@@ -124,19 +127,21 @@ export function pmTools(orch: Orch): Tool[] {
     name: 'update_project',
     description:
       'Update a project. Use notes as your own running brief for the project: decisions, constraints, where things stand. ' +
-      'Notes replace the previous notes, so write the full current version.',
+      'Notes replace the previous notes, so write the full current version. ' +
+      'You can make a project private; only the user can make it open again, from the project page.',
     input: z.object({
       project: z.string(),
       name: z.string().optional(),
       goal: z.string().optional(),
       status: z.enum(['active', 'paused', 'done', 'archived']).optional(),
       notes: z.string().optional(),
+      private: z.literal(true).optional().describe('Make the project private. Tasks running on crew not cleared for private work are stopped.'),
     }),
     async run({ project, ...patch }) {
       const p = needProject(project);
       const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
       const next = orch.updateProject(p.id, clean);
-      return `Updated ${next.id} "${next.name}" (${next.status}).`;
+      return `Updated ${next.id} "${next.name}" (${next.status}${next.private ? ', private' : ''}).`;
     },
   });
 
@@ -382,7 +387,7 @@ export function pmTools(orch: Orch): Tool[] {
     async run() {
       const s = getSettings();
       const crew = s.crew
-        .map((c) => `${c.id}${c.id === s.defaultCrewId ? ' (default)' : ''}: ${c.name} — ${c.strengths} [${c.runtime}${c.model ? ` · ${c.model}` : ''}]`)
+        .map((c) => `${c.id}${c.id === s.defaultCrewId ? ' (default)' : ''}: ${c.name} — ${c.strengths} [${c.runtime}${c.model ? ` · ${c.model}` : ''}]${cleared(c) ? '' : ' [not cleared for private work]'}`)
         .join('\n');
       const rem = reminders.all().map((r) => `${r.id}: ${new Date(r.dueAt).toLocaleString()} — ${r.note}`);
       return `Crew:\n${crew}\n\nReminders:\n${rem.length ? rem.join('\n') : '(none)'}`;

@@ -20,8 +20,9 @@ import { emit, sync } from './bus.ts';
 import { approvals, DATA_DIR, events, kvGet, kvSet, memory, messages, nextId, projects, reminders, tasks } from './db.ts';
 import type { Usage } from './llm/types.ts';
 import { DEMO, getSettings, resolveCrew, runtimeDef, runtimeStatus } from './settings.ts';
+import { cleared, clearedCrew, clearedNames, crewOf, isPrivate, managerHoldsMail, setManagerHoldsMail, taskCleared, watched, workerToken } from './privacy.ts';
 import { pmTools, projectSummary, type Orch } from './tools/pm.ts';
-import { clip, ToolError, type Host } from './tools/tool.ts';
+import { clip, ToolError, type Host, type Tool } from './tools/tool.ts';
 import { workerTools } from './tools/worker.ts';
 
 export const VERSION = '0.1.0';
@@ -100,7 +101,7 @@ function contextBlock(full: boolean, via?: InboxItem['via'], voice?: boolean): s
     if (s.userName) lines.push(`User: ${s.userName}`);
     lines.push(
       'Crew:',
-      ...s.crew.map((c) => `- ${c.id}${c.id === s.defaultCrewId ? ' (default)' : ''}: ${c.name} — ${c.strengths}`),
+      ...s.crew.map((c) => `- ${c.id}${c.id === s.defaultCrewId ? ' (default)' : ''}: ${c.name} — ${c.strengths}${cleared(c) ? '' : ' [not cleared for private work]'}`),
     );
     const skillNames = enabledSkillNames();
     if (skillNames.length) {
@@ -213,7 +214,48 @@ function firstMessage(t: Task): InboxItem {
   return { from: 'manager', text };
 }
 
+/**
+ * The mailbox tools, reporting each use. An agent that opens the mailbox holds private material
+ * from then on: for a task that is recorded on the task; for the manager it lasts until its turn ends.
+ */
+export function mailboxTools(): Tool[] {
+  return watched(googleTools(), (agentId) => {
+    if (agentId === PM) return setManagerHoldsMail(true);
+    const t = tasks.get(agentId);
+    if (!t) return;
+    // Uncleared agents are never given these tools; this is the lock behind that door.
+    if (!taskCleared(t)) throw new ToolError('This crew member is not cleared for private work, so it cannot open the user’s email or calendar.');
+    if (!t.private) patchTask(t.id, { private: true });
+  });
+}
+
+/** Ends a task that may not run, the same way a failure ends one. */
+function refuse(t: Task, why: string): void {
+  const next = patchTask(t.id, { status: 'failed', error: why, finishedAt: Date.now(), statusLine: 'Not started: private work' });
+  emit(t.id, 'notice', { text: why });
+  const waiter = childDone.get(t.id);
+  if (waiter) {
+    childDone.delete(t.id);
+    waiter({ ok: false, text: '', error: why });
+  } else if (next && !next.parentId) {
+    notifyPm(taskEvent('task_failed', next, why, `${next.id} not started · ${next.title}`));
+  }
+}
+
 function startTask(t: Task): void {
+  // The last check before anything is sent to a model. Earlier checks give the manager a clear
+  // error up front; this one holds whatever changed since: the project was made private, the crew
+  // member's clearance was withdrawn, or they were removed.
+  if (isPrivate(t, projects.get(t.projectId))) {
+    const crew = crewOf(t);
+    if (!crew || !cleared(crew)) {
+      return refuse(t, `This is private work and ${t.crewName} is not cleared for it. Assign it to: ${clearedNames()}.`);
+    }
+    // Run on the account that is cleared now, not the one recorded when the task was written.
+    if (crew.runtime !== t.runtime || crew.model !== t.model) {
+      t = patchTask(t.id, { runtime: crew.runtime, model: crew.model, effort: crew.effort ?? null, costIncluded: runtimeDef(crew.runtime).kind === 'cli' }) ?? t;
+    }
+  }
   patchTask(t.id, { status: 'running', startedAt: t.startedAt ?? Date.now(), finishedAt: null, statusLine: 'Starting', error: '' });
   runner.send(t.id, firstMessage(t));
 }
@@ -282,8 +324,18 @@ export const agentHost: Host = {
     const parent = tasks.get(agentId);
     if (!parent) throw new ToolError('Only task agents can delegate.');
     if (parent.parentId) throw new ToolError('Helpers cannot delegate further. Do this part yourself.');
-    const children = items.map((item) => {
-      const crew = item.crew ? resolveCrew(item.crew) : resolveCrew(parent.crewId);
+    // A private task's helpers are private too, and stay with cleared crew.
+    const confidential = isPrivate(parent, projects.get(parent.projectId));
+    const picks = items.map((item) => (item.crew ? resolveCrew(item.crew) : resolveCrew(parent.crewId)));
+    const barred = confidential ? picks.filter((c) => !cleared(c)) : [];
+    if (barred.length) {
+      throw new ToolError(
+        `This is private work, and ${[...new Set(barred.map((c) => c.name))].join(', ')} ${barred.length > 1 ? 'are' : 'is'} not cleared for it. ` +
+          `Give these parts to ${clearedNames()}, or do them yourself.`,
+      );
+    }
+    const children = items.map((item, i) => {
+      const crew = picks[i]!;
       const child: Task = {
         id: nextId('T'),
         projectId: parent.projectId,
@@ -305,6 +357,7 @@ export const agentHost: Host = {
         tokensOut: 0,
         costUsd: 0,
         costIncluded: runtimeDef(crew.runtime).kind === 'cli',
+        private: confidential,
         createdAt: Date.now(),
         startedAt: null,
         finishedAt: null,
@@ -372,7 +425,7 @@ function specFor(id: string): AgentSpec {
       effort: s.pm.effort,
       cwd: PM_DIR,
       system: PM_SYSTEM,
-      tools: [...pmTools(orch), ...googleTools()],
+      tools: [...pmTools(orch), ...mailboxTools()],
       mcp: cli ? { url: `${baseUrl}/mcp`, token: MCP_TOKEN } : undefined,
     };
   }
@@ -381,6 +434,8 @@ function specFor(id: string): AgentSpec {
   const project = projects.get(t.projectId);
   if (!project) throw new Error(`Task ${id} has no project`);
   fs.mkdirSync(project.workspace, { recursive: true });
+  // Email and calendar go only to crew cleared for private work.
+  const mailbox = taskCleared(t);
   return {
     id: t.id,
     manager: false,
@@ -389,11 +444,11 @@ function specFor(id: string): AgentSpec {
     effort: t.effort,
     cwd: project.workspace,
     system: workerSystem({ crewName: t.crewName, cwd: project.workspace, helper: !!t.parentId }),
-    tools: [...workerTools({ canDelegate: !t.parentId }), ...googleTools(), ...(enabledPluginNames().length ? pluginTools() : [])],
+    tools: [...workerTools({ canDelegate: !t.parentId }), ...(mailbox ? mailboxTools() : []), ...(enabledPluginNames().length ? pluginTools() : [])],
     // Agents on a CLI account bring their own tools; email, calendar and plugin tools reach them over MCP.
     mcp:
-      runtimeDef(t.runtime).kind === 'cli' && (googleConnected() || enabledPluginNames().length)
-        ? { url: `${baseUrl}/mcp/worker/${encodeURIComponent(t.id)}`, token: MCP_TOKEN }
+      runtimeDef(t.runtime).kind === 'cli' && ((mailbox && googleConnected()) || enabledPluginNames().length)
+        ? { url: `${baseUrl}/mcp/worker/${encodeURIComponent(t.id)}`, token: workerToken(MCP_TOKEN, t.id) }
         : undefined,
     cliPreamble: cliWorkerPreamble({ crewName: t.crewName, cwd: project.workspace }),
     readDirs: skillFolders(),
@@ -408,7 +463,11 @@ function onStart(id: string): void {
 }
 
 function onFinish(id: string, outcome: Outcome): void {
-  if (id === PM) return sync({ pm: pmStatus() });
+  if (id === PM) {
+    // The turn in which the manager had the mailbox open is over.
+    setManagerHoldsMail(false);
+    return sync({ pm: pmStatus() });
+  }
   const t = tasks.get(id);
   if (!t) return;
   const now = Date.now();
@@ -510,7 +569,7 @@ export const orch: Orch & {
   state(): Promise<AppState>;
   boot(): void;
 } = {
-  async createProject({ name, goal, workspacePath }) {
+  async createProject({ name, goal, workspacePath, private: confidential }) {
     const id = nextId('P');
     let workspace: string;
     if (workspacePath) {
@@ -530,6 +589,7 @@ export const orch: Orch & {
       notes: '',
       workspace,
       hue: (projects.all().length * 67 + 28) % 360,
+      private: !!confidential,
       createdAt: now,
       updatedAt: now,
     };
@@ -539,17 +599,46 @@ export const orch: Orch & {
   },
 
   updateProject(id, patch) {
+    const before = projects.get(id);
     const next = projects.update(id, patch);
     if (!next) throw new ToolError(`No project ${id}.`);
     sync({ projects: [next] });
+    if (next.private && !before?.private) {
+      // From now on its tasks stay with cleared crew: mark them, and stop any that are not.
+      for (const t of tasks.byProject(id)) {
+        if (!t.private) patchTask(t.id, { private: true });
+        if (['queued', 'running', 'waiting'].includes(t.status) && !taskCleared(t)) {
+          orch.cancelTask(t.id, `Stopped: the project was made private and ${t.crewName} is not cleared for private work`);
+          if (!t.parentId) notifyPm(taskEvent('task_cancelled', tasks.get(t.id)!, `The project was made private. ${t.crewName} is not cleared for private work, so this task was stopped. Reassign it to: ${clearedNames()}.`, `${t.id} stopped · project made private`));
+        }
+      }
+    }
     tick();
     return next;
   },
 
   createTasks(projectId, items) {
-    const created: Task[] = [];
-    for (const item of items) {
+    const project = projects.get(projectId);
+    if (!project) throw new ToolError(`No project ${projectId}.`);
+    // Private when the project is, or when the manager has the user's mail in front of it this turn.
+    const confidential = project.private || managerHoldsMail();
+    const picks = items.map((item) => {
       const crew = resolveCrew(item.crew);
+      if (!confidential || cleared(crew)) return crew;
+      // No one was named (or the name was not found) and the default is not cleared: use someone who is.
+      const named = !!item.crew && [crew.id.toLowerCase(), crew.name.toLowerCase()].includes(item.crew.trim().toLowerCase());
+      const stand = named ? undefined : clearedCrew()[0];
+      if (stand) return stand;
+      throw new ToolError(
+        project.private
+          ? `${project.id} is a private project and ${crew.name} is not cleared for private work. Assign this to: ${clearedNames()}.`
+          : `You have opened the user’s email or calendar in this turn, and ${crew.name} is not cleared for private work, so nothing can be handed to them right now. ` +
+              `Assign this to: ${clearedNames()}. If the task involves nothing from the mailbox, create it in a later turn.`,
+      );
+    });
+    const created: Task[] = [];
+    for (const [i, item] of items.entries()) {
+      const crew = picks[i]!;
       const dependsOn = (item.dependsOn ?? []).map((ref) => {
         const m = /^#(\d+)$/.exec(ref.trim());
         if (m) {
@@ -582,6 +671,7 @@ export const orch: Orch & {
         tokensOut: 0,
         costUsd: 0,
         costIncluded: runtimeDef(crew.runtime).kind === 'cli',
+        private: confidential,
         createdAt: Date.now(),
         startedAt: null,
         finishedAt: null,
@@ -597,6 +687,12 @@ export const orch: Orch & {
   messageTask(id, text, from) {
     const t = tasks.get(id);
     if (!t) throw new ToolError(`No task ${id}.`);
+    if (from === 'manager' && managerHoldsMail() && !taskCleared(t)) {
+      throw new ToolError(
+        `You have opened the user’s email or calendar in this turn, and ${t.crewName} is not cleared for private work, so no message can go to them right now. ` +
+          'If what you want to say involves nothing from the mailbox, send it in a later turn.',
+      );
+    }
     const waiting = questions.get(t.id);
     if (waiting) {
       emit(t.id, 'user', { from, text });

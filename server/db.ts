@@ -62,6 +62,14 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 `);
 
+/** Adds a column to a table made before the column existed. New and old databases end up alike. */
+function addColumn(table: string, column: string, definition: string): void {
+  const have = db.pragma(`table_info(${table})`) as { name: string }[];
+  if (!have.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+addColumn('projects', 'private', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('tasks', 'private', 'INTEGER NOT NULL DEFAULT 0');
+
 // ---------- key/value ----------
 
 const kvGetStmt = db.prepare('SELECT value FROM kv WHERE key = ?');
@@ -105,6 +113,7 @@ function toProject(r: any): Project {
     notes: r.notes,
     workspace: r.workspace,
     hue: r.hue,
+    private: !!r.private,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -127,9 +136,9 @@ export const projects = {
   },
   insert(p: Project): void {
     db.prepare(
-      `INSERT INTO projects (id, name, goal, status, notes, workspace, hue, created_at, updated_at)
-       VALUES (@id, @name, @goal, @status, @notes, @workspace, @hue, @createdAt, @updatedAt)`,
-    ).run(p);
+      `INSERT INTO projects (id, name, goal, status, notes, workspace, hue, private, created_at, updated_at)
+       VALUES (@id, @name, @goal, @status, @notes, @workspace, @hue, @private, @createdAt, @updatedAt)`,
+    ).run({ ...p, private: p.private ? 1 : 0 });
   },
   update(id: string, patch: Partial<Project>): Project | null {
     const cur = projects.get(id);
@@ -137,8 +146,8 @@ export const projects = {
     const next = { ...cur, ...patch, id, updatedAt: Date.now() };
     db.prepare(
       `UPDATE projects SET name=@name, goal=@goal, status=@status, notes=@notes,
-       workspace=@workspace, hue=@hue, updated_at=@updatedAt WHERE id=@id`,
-    ).run(next);
+       workspace=@workspace, hue=@hue, private=@private, updated_at=@updatedAt WHERE id=@id`,
+    ).run({ ...next, private: next.private ? 1 : 0 });
     return next;
   },
   remove(id: string): void {
@@ -180,6 +189,7 @@ function toTask(r: any): Task {
     tokensOut: r.tokens_out,
     costUsd: r.cost_usd,
     costIncluded: !!r.cost_included,
+    private: !!r.private,
     createdAt: r.created_at,
     startedAt: r.started_at,
     finishedAt: r.finished_at,
@@ -204,11 +214,11 @@ export const tasks = {
     db.prepare(
       `INSERT INTO tasks (id, project_id, parent_id, title, brief, status, crew_id, crew_name, runtime,
         model, effort, depends_on, status_line, result, error, attempt, tokens_in, tokens_out, cost_usd,
-        cost_included, created_at, started_at, finished_at)
+        cost_included, private, created_at, started_at, finished_at)
        VALUES (@id, @projectId, @parentId, @title, @brief, @status, @crewId, @crewName, @runtime,
         @model, @effort, @dependsOn, @statusLine, @result, @error, @attempt, @tokensIn, @tokensOut,
-        @costUsd, @costIncluded, @createdAt, @startedAt, @finishedAt)`,
-    ).run({ ...t, dependsOn: JSON.stringify(t.dependsOn), costIncluded: t.costIncluded ? 1 : 0 });
+        @costUsd, @costIncluded, @private, @createdAt, @startedAt, @finishedAt)`,
+    ).run({ ...t, dependsOn: JSON.stringify(t.dependsOn), costIncluded: t.costIncluded ? 1 : 0, private: t.private ? 1 : 0 });
   },
   update(id: string, patch: Partial<Task>): Task | null {
     const cur = tasks.get(id);
@@ -218,9 +228,9 @@ export const tasks = {
       `UPDATE tasks SET title=@title, brief=@brief, status=@status, crew_id=@crewId, crew_name=@crewName,
         runtime=@runtime, model=@model, effort=@effort, depends_on=@dependsOn, status_line=@statusLine,
         result=@result, error=@error, attempt=@attempt, tokens_in=@tokensIn, tokens_out=@tokensOut,
-        cost_usd=@costUsd, cost_included=@costIncluded, started_at=@startedAt, finished_at=@finishedAt
+        cost_usd=@costUsd, cost_included=@costIncluded, private=@private, started_at=@startedAt, finished_at=@finishedAt
        WHERE id=@id`,
-    ).run({ ...next, dependsOn: JSON.stringify(next.dependsOn), costIncluded: next.costIncluded ? 1 : 0 });
+    ).run({ ...next, dependsOn: JSON.stringify(next.dependsOn), costIncluded: next.costIncluded ? 1 : 0, private: next.private ? 1 : 0 });
     return next;
   },
 };

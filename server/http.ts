@@ -42,7 +42,7 @@ export const app = new Hono();
 app.use('*', async (c, next) => {
   const url = new URL(c.req.url);
   // The MCP endpoints check their own token; CLI agents call them without a browser origin.
-  if (url.pathname === '/mcp' || url.pathname === '/mcp/google' || url.pathname.startsWith('/mcp/worker/')) return next();
+  if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/worker/')) return next();
   const hostname = (c.req.header('host') ?? '').replace(/:\d+$/, '');
   if (!LOOPBACK.has(hostname)) {
     // Reached over the network: only with an access token.
@@ -154,14 +154,16 @@ app.post('/api/pm/reset', (c) => {
 // ---------- projects and tasks ----------
 
 app.post('/api/projects', async (c) => {
-  const body = await c.req.json<{ name: string; goal?: string; workspacePath?: string }>();
+  const body = await c.req.json<{ name: string; goal?: string; workspacePath?: string; private?: boolean }>();
   if (!body.name?.trim()) return c.json({ error: 'A project needs a name.' }, 400);
-  return c.json(await orch.createProject({ name: body.name.trim(), goal: body.goal ?? '', workspacePath: body.workspacePath || undefined }));
+  return c.json(await orch.createProject({ name: body.name.trim(), goal: body.goal ?? '', workspacePath: body.workspacePath || undefined, private: body.private === true }));
 });
 
 app.patch('/api/projects/:id', async (c) => {
   const patch = await c.req.json();
-  const allowed = Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'goal', 'status', 'notes'].includes(k)));
+  const allowed: Record<string, unknown> = Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'goal', 'status', 'notes'].includes(k)));
+  // Only the dashboard can open a private project up again; the manager's own tool can only close one.
+  if (typeof patch.private === 'boolean') allowed.private = patch.private;
   return c.json(orch.updateProject(c.req.param('id'), allowed));
 });
 
@@ -560,7 +562,6 @@ app.delete('/api/google', async (c) => {
 });
 
 app.all('/mcp', mcpEndpoint);
-app.all('/mcp/google', mcpEndpoint);
 app.all('/mcp/worker/:id', mcpEndpoint);
 
 // ---------- the built dashboard ----------

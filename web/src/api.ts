@@ -42,7 +42,7 @@ export const api = {
   stopPm: () => post('/api/pm/stop'),
   resetPm: () => post('/api/pm/reset'),
 
-  createProject: (body: { name: string; goal?: string; workspacePath?: string }) => post<Project>('/api/projects', body),
+  createProject: (body: { name: string; goal?: string; workspacePath?: string; private?: boolean }) => post<Project>('/api/projects', body),
   updateProject: (id: string, patch: Partial<Project>) =>
     request<Project>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteProject: (id: string) => request(`/api/projects/${id}`, { method: 'DELETE' }),

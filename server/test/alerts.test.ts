@@ -42,6 +42,7 @@ function task(fields: Partial<Task> = {}): Task {
     tokensOut: 0,
     costUsd: 0,
     costIncluded: false,
+    private: false,
     createdAt: 0,
     startedAt: 0,
     finishedAt: 1,

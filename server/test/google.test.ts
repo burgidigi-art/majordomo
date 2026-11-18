@@ -206,7 +206,7 @@ test('sign-in asks only for read, draft and calendar-read access, and rejects a 
   assert.ok(!state2.includes('rt-1') && !state2.includes('shh-secret'), 'no credential reaches the dashboard');
 });
 
-test('once connected the tools appear for the manager and for CLI workers, and none of them sends', async () => {
+test('once connected the tools appear for the manager, and none of them sends', async () => {
   const names = tools.googleTools().map((t) => t.name);
   assert.deepEqual(names, ['gmail_search', 'gmail_read', 'gmail_create_draft', 'calendar_events']);
   assert.ok(!names.some((n) => /send/i.test(n)));
@@ -218,8 +218,47 @@ test('once connected the tools appear for the manager and for CLI workers, and n
     (await (await app.request(p, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${orch.MCP_TOKEN}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method }) })).json()) as any;
   const manager = (await rpc('/mcp', 'tools/list')).result.tools.map((t: any) => t.name);
   assert.ok(manager.includes('gmail_search') && manager.includes('create_tasks'));
-  const worker = (await rpc('/mcp/google', 'tools/list')).result.tools.map((t: any) => t.name);
-  assert.deepEqual(worker, names, 'workers get email and calendar, not the manager’s own tools');
+});
+
+test('the mailbox opens only for crew cleared for private work, and marks what touches it', async () => {
+  const privacy = await import('../privacy.ts');
+  const settings = await import('../settings.ts');
+  // The later tests look at what was asked of Google from a clean slate; this one's searches are dropped at the end.
+  const callsBefore = g.calls.length;
+  const base = settings.getSettings();
+  settings.saveSettings({ ...base, crew: [...base.crew, { id: 'flash', name: 'Flash', strengths: '', runtime: 'openrouter', model: 'some/flash' }] });
+  const p = await orch.orch.createProject({ name: 'Inbox zero', goal: '' });
+  orch.orch.updateProject(p.id, { status: 'paused' });
+  const [mine, theirs] = orch.orch.createTasks(p.id, [
+    { title: 'Triage', brief: 'x', crew: 'builder' },
+    { title: 'Legwork', brief: 'x', crew: 'flash' },
+  ]);
+  const rpc = async (route: string, token: string, method: string, params?: object) =>
+    (await (await app.request(route, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).json()) as any;
+  const as = (id: string, method: string, params?: object) => rpc(`/mcp/worker/${id}`, privacy.workerToken(orch.MCP_TOKEN, id), method, params);
+  const search = { name: 'gmail_search', arguments: { query: 'is:unread' } };
+
+  // A worker on a CLI account is offered the mailbox only if its crew member is cleared.
+  assert.deepEqual((await as(mine!.id, 'tools/list')).result.tools.map((t: any) => t.name), ['gmail_search', 'gmail_read', 'gmail_create_draft', 'calendar_events']);
+  assert.deepEqual((await as(theirs!.id, 'tools/list')).result.tools, []);
+  const refused = await as(theirs!.id, 'tools/call', search);
+  assert.ok(refused.error, 'and asking for it by name gets nowhere');
+
+  // Reading mail makes the task private, so it can no longer hand parts to anyone who is not cleared.
+  assert.equal(db.tasks.get(mine!.id)!.private, false);
+  assert.equal((await as(mine!.id, 'tools/call', search)).result.isError, false);
+  assert.equal(db.tasks.get(mine!.id)!.private, true);
+  await assert.rejects(orch.agentHost.delegate(mine!.id, [{ title: 'Summarise', brief: 'x', crew: 'flash' }], new AbortController().signal), /private work, and Flash is not cleared/);
+
+  // The manager reading mail closes the door for the rest of its turn.
+  assert.equal(privacy.managerHoldsMail(), false);
+  assert.equal((await rpc('/mcp', orch.MCP_TOKEN, 'tools/call', search)).result.isError, false);
+  assert.equal(privacy.managerHoldsMail(), true);
+  assert.throws(() => orch.orch.createTasks(p.id, [{ title: 'Summarise the thread', brief: 'x', crew: 'flash' }]), /opened the user’s email or calendar in this turn/);
+  privacy.setManagerHoldsMail(false);
+  settings.saveSettings(base);
+  assert.ok(g.calls.slice(callsBefore).every((c) => c.method === 'GET'), 'reading is all that happened');
+  g.calls.splice(callsBefore);
 });
 
 test('search lists mail, fenced off as other people’s words', async () => {

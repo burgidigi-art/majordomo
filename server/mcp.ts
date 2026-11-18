@@ -2,9 +2,9 @@ import type { Context } from 'hono';
 import { describeError } from './llm/index.ts';
 import { projects, tasks } from './db.ts';
 import { googleConnected } from './google.ts';
-import { agentHost, MCP_TOKEN, orch, VERSION } from './orchestrator.ts';
+import { agentHost, mailboxTools, MCP_TOKEN, orch, VERSION } from './orchestrator.ts';
+import { taskCleared, workerToken } from './privacy.ts';
 import { enabledPluginNames, pluginTools } from './plugins.ts';
-import { googleTools } from './tools/google.ts';
 import { pmTools } from './tools/pm.ts';
 import { ToolError, toolDef, type Host, type Tool } from './tools/tool.ts';
 
@@ -22,7 +22,7 @@ const noHost: Host = {
 };
 
 /** Everything the manager can use over MCP. web_fetch is left out: every CLI already has its own. */
-const managerTools = (): Tool[] => [...pmTools(orch).filter((t) => t.name !== 'web_fetch'), ...googleTools()];
+const managerTools = (): Tool[] => [...pmTools(orch).filter((t) => t.name !== 'web_fetch'), ...mailboxTools()];
 
 interface Caller {
   agentId: string;
@@ -70,37 +70,40 @@ async function handle(msg: any, tools: Tool[], caller: Caller = managerCaller): 
 }
 
 /**
- * The tools a worker on a CLI account gets from 00Dojo: email and calendar when connected, and the
- * plugin tools. Calls run as that task, so approvals show which agent is asking.
+ * The tools a worker on a CLI account gets from 00Dojo: email and calendar when connected and the
+ * crew member is cleared for private work, and the plugin tools. Calls run as that task, so
+ * approvals show which agent is asking.
  */
 function workerEndpointFor(agentId: string): { tools: Tool[]; caller: Caller } | null {
   const t = tasks.get(agentId);
   if (!t) return null;
   const cwd = projects.get(t.projectId)?.workspace ?? process.cwd();
   return {
-    tools: [...(googleConnected() ? googleTools() : []), ...(enabledPluginNames().length ? pluginTools() : [])],
+    tools: [...(googleConnected() && taskCleared(t) ? mailboxTools() : []), ...(enabledPluginNames().length ? pluginTools() : [])],
     caller: { agentId, cwd, host: agentHost },
   };
 }
 
 /**
- * `/mcp` serves the manager; `/mcp/google` serves worker agents the email and calendar tools only;
- * `/mcp/worker/<task>` serves one worker its email, calendar and plugin tools.
+ * `/mcp` serves the manager, and takes the manager's token. `/mcp/worker/<task>` serves one worker
+ * its email, calendar and plugin tools, and takes a token made for that task alone: a worker's
+ * token opens neither the manager's tools nor another task's.
  */
 export async function mcpEndpoint(c: Context): Promise<Response> {
-  if (c.req.header('authorization') !== `Bearer ${MCP_TOKEN}`) return c.json({ error: 'unauthorized' }, 401);
-  if (c.req.method !== 'POST') return c.body(null, 405, { Allow: 'POST' });
   const pathname = new URL(c.req.url).pathname;
+  const worker = /^\/mcp\/worker\/([^/]+)$/.exec(pathname);
+  const expected = worker ? workerToken(MCP_TOKEN, decodeURIComponent(worker[1]!)) : MCP_TOKEN;
+  if (c.req.header('authorization') !== `Bearer ${expected}`) return c.json({ error: 'unauthorized' }, 401);
+  if (c.req.method !== 'POST') return c.body(null, 405, { Allow: 'POST' });
   let caller = managerCaller;
   let tools: Tool[];
-  const worker = /^\/mcp\/worker\/([^/]+)$/.exec(pathname);
   if (worker) {
     const found = workerEndpointFor(decodeURIComponent(worker[1]!));
     if (!found) return c.json({ error: 'unknown agent' }, 404);
     tools = found.tools;
     caller = found.caller;
   } else {
-    tools = pathname === '/mcp/google' ? googleTools() : managerTools();
+    tools = managerTools();
   }
   let body: any;
   try {

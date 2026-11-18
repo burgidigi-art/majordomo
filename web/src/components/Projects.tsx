@@ -1,6 +1,7 @@
-import { ArrowLeft, ChevronRight, File, Folder, FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, File, Folder, FolderOpen, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { FileEntry, Project, ProjectStatus, Task, TaskStatus } from '../../../shared/types.ts';
+import { crewCleared } from '../../../shared/privacy.ts';
 import { api } from '../api.ts';
 import { ago, bytes, compact, duration, isLive, isTrouble, money, taskElapsed, useNow } from '../lib.ts';
 import { useStore } from '../store.ts';
@@ -46,6 +47,11 @@ export function ProjectCard({ project: p, now }: { project: Project; now: number
       <div className="row">
         <span className="chip">{p.id}</span>
         {p.status !== 'active' && <span className="pill">{p.status}</span>}
+        {p.private && (
+          <span className="pill" title="Private: only crew cleared for private work">
+            <Lock size={11} /> private
+          </span>
+        )}
         <span className="grow" />
         <span className="faint" style={{ fontSize: 12 }}>
           {ago(p.updatedAt, now)}
@@ -90,8 +96,9 @@ function NewProject({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
   const [folder, setFolder] = useState('');
+  const [confidential, setConfidential] = useState(false);
   const create = async () => {
-    const p = await attempt(() => api.createProject({ name, goal, workspacePath: folder.trim() || undefined }));
+    const p = await attempt(() => api.createProject({ name, goal, workspacePath: folder.trim() || undefined, private: confidential }));
     if (p) {
       onDone();
       window.location.hash = `/projects/${p.id}`;
@@ -113,6 +120,13 @@ function NewProject({ onDone }: { onDone: () => void }) {
         <label htmlFor="np-goal">What does done look like?</label>
         <textarea id="np-goal" className="textarea" value={goal} onChange={(e) => setGoal(e.target.value)} />
       </div>
+      <label className="switch">
+        <input type="checkbox" checked={confidential} onChange={(e) => setConfidential(e.target.checked)} />
+        <span>
+          Private
+          <div className="hint">Its tasks only ever go to crew you have cleared for private work (Settings → Crew).</div>
+        </span>
+      </label>
       <div className="row">
         <button className="btn primary" disabled={!name.trim()} onClick={() => void create()}>
           Create project
@@ -357,6 +371,8 @@ export function ProjectDetail({ id }: { id: string }) {
   const project = useStore((s) => s.app?.projects.find((p) => p.id === id));
   const allTasks = useStore((s) => s.app?.tasks);
   const tasks = useMemo(() => (allTasks ?? []).filter((t) => t.projectId === id), [allTasks, id]);
+  const settings = useStore((s) => s.app!.settings);
+  const runtimes = useStore((s) => s.app!.runtimes);
   const [tab, setTab] = useState<'tasks' | 'files' | 'notes'>('tasks');
 
   if (!project) {
@@ -374,6 +390,21 @@ export function ProjectDetail({ id }: { id: string }) {
   const cost = tasks.filter((t) => !t.costIncluded).reduce((n, t) => n + t.costUsd, 0);
   const tokens = tasks.reduce((n, t) => n + t.tokensIn + t.tokensOut, 0);
   const setStatus = (status: ProjectStatus) => void attempt(() => api.updateProject(project.id, { status }));
+  // Work under way with crew who are not cleared for private work: making the project private stops it.
+  const exposed = tasks.filter((t) => {
+    if (!['queued', 'running', 'waiting'].includes(t.status)) return false;
+    const member = settings.crew.find((c) => c.id === t.crewId);
+    return !member || !crewCleared(member, settings.pm.runtime, (r) => runtimes.find((x) => x.id === r)?.family ?? r);
+  });
+  const togglePrivate = () => {
+    const question = project.private
+      ? `Open “${project.name}” up again? Its tasks could then be given to any crew member, including ones on other companies’ models.`
+      : exposed.length
+        ? `Make “${project.name}” private? ${exposed.length === 1 ? 'One task is' : `${exposed.length} tasks are`} with crew not cleared for private work and will be stopped: ${exposed.map((t) => `${t.id} (${t.crewName})`).join(', ')}.`
+        : '';
+    if (question && !window.confirm(question)) return;
+    void attempt(() => api.updateProject(project.id, { private: !project.private }), project.private ? 'Opened up' : 'Now private');
+  };
   const remove = () => {
     if (!window.confirm(`Delete “${project.name}” and its task history? Files in the workspace folder are left on disk.`)) return;
     void attempt(() => api.deleteProject(project.id)).then(() => (window.location.hash = '/projects'));
@@ -390,10 +421,28 @@ export function ProjectDetail({ id }: { id: string }) {
             <div className="row" style={{ marginBottom: 6 }}>
               <span className="proj-dot" />
               <span className="chip">{project.id}</span>
+              {project.private && (
+                <span className="pill" title="Its tasks only ever go to crew cleared for private work">
+                  <Lock size={11} /> private
+                </span>
+              )}
             </div>
             <h1 className="page-title">{project.name}</h1>
             {project.goal && <p className="page-sub">{project.goal}</p>}
           </div>
+          <button
+            className={`btn ${project.private ? '' : 'ghost'}`}
+            aria-pressed={project.private}
+            title={
+              project.private
+                ? 'Private: its tasks only ever go to crew you have cleared for private work. Click to open it up.'
+                : 'Open: its tasks can go to any crew member. Click to make it private.'
+            }
+            onClick={togglePrivate}
+          >
+            {project.private ? <Lock size={14} /> : <LockOpen size={14} />}
+            {project.private ? 'Private' : 'Make private'}
+          </button>
           <select className="select" style={{ width: 130 }} value={project.status} aria-label="Project status" onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
             <option value="active">Active</option>
             <option value="paused">Paused</option>

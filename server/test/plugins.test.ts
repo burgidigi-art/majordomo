@@ -247,7 +247,9 @@ test('a plugin can be added by hand, tested, and removed', async () => {
 test('a CLI agent reaches the plugin tools through its own 00Dojo endpoint, as itself', async () => {
   const project = await orch.orch.createProject({ name: 'Launch', goal: 'Ship it' });
   const [task] = orch.orch.createTasks(project.id, [{ title: 'Post the news', brief: 'Post it' }]);
-  const call = (body: object, token = orch.MCP_TOKEN, id = task!.id) =>
+  // Loaded here, not at the top: server modules open the database where MAJORDOMO_HOME points when first imported.
+  const { workerToken } = await import('../privacy.ts');
+  const call = (body: object, token = workerToken(orch.MCP_TOKEN, task!.id), id = task!.id) =>
     app.request(`/mcp/worker/${id}`, { method: 'POST', headers: { host: '127.0.0.1:4317', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
   const list = (await (await call({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).json()) as { result: { tools: { name: string }[] } };
@@ -259,7 +261,7 @@ test('a CLI agent reaches the plugin tools through its own 00Dojo endpoint, as i
   assert.deepEqual([res.result.content[0]!.text, res.result.isError], ['Hello: 2 notes about press', false]);
 
   assert.equal((await call({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, 'wrong')).status, 401);
-  assert.equal((await call({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, orch.MCP_TOKEN, 'T-999')).status, 404);
+  assert.equal((await call({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, workerToken(orch.MCP_TOKEN, 'T-999'), 'T-999')).status, 404);
 });
 
 test('Claude Code workers use plugins only through 00Dojo; Gemini workers get the connection outside the project', async () => {

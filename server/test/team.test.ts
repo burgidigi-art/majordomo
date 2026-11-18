@@ -38,6 +38,7 @@ function task(crewId: string, fields: Partial<Task>): Task {
     tokensOut: 0,
     costUsd: 0,
     costIncluded: true,
+    private: false,
     createdAt: NOW - 60 * MIN,
     startedAt: null,
     finishedAt: null,

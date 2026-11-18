@@ -1,6 +1,7 @@
-import { Check, Copy, Loader2, Mail, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Lock, LockOpen, Mail, Plus, Smartphone, Star, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import type { CrewProfile, Effort, ModelOption, RuntimeId, RuntimeInfo, Settings as SettingsT, VoiceProvider, VoiceStatus } from '../../../shared/types.ts';
+import { crewCleared } from '../../../shared/privacy.ts';
 import { api } from '../api.ts';
 import { browserVoices, say, setVoicePrefs, stopSpeaking, useSpeaker, type VoicePrefs } from '../speaker.ts';
 import { useStore } from '../store.ts';
@@ -852,10 +853,16 @@ export function Settings({ section }: { section?: string }) {
             The agents your manager can assign work to. Describe what each is good at — the manager reads this to decide who gets which task. Mix
             accounts freely: a strong model for hard problems, a fast one for legwork.
           </p>
+          <p>
+            Whatever a crew member works on is sent to the company that runs its model. <b>Private: yes</b> marks the ones you are happy to
+            trust with sensitive material: only they can be given tasks in a private project, or open your email and calendar. It starts as yes for
+            crew on the same company’s models as your manager, and no for everyone else.
+          </p>
           <div className="card">
             {draft.crew.map((c) => {
               const fam = app.runtimes.find((r) => r.id === c.runtime)?.family ?? 'demo';
               const isDefault = draft.defaultCrewId === c.id;
+              const isCleared = crewCleared(c, draft.pm.runtime, (r) => app.runtimes.find((x) => x.id === r)?.family ?? r);
               return (
                 <div key={c.id} className="crew-row">
                   <Avatar name={c.name} family={fam} />
@@ -879,14 +886,29 @@ export function Settings({ section }: { section?: string }) {
                   <div className="field">
                     <ModelPicker runtime={c.runtime} value={c.model} onChange={(model) => patchCrew(c.id, { model })} ready={ready(c.runtime)} />
                   </div>
-                  <button
-                    className={`btn sm ${isDefault ? '' : 'ghost'}`}
-                    title="The manager uses the default when it does not pick someone"
-                    onClick={() => patch({ defaultCrewId: c.id })}
-                  >
-                    <Star size={13} fill={isDefault ? 'currentColor' : 'none'} />
-                    {isDefault ? 'Default' : 'Set default'}
-                  </button>
+                  <div className="field">
+                    <button
+                      className={`btn sm ${isDefault ? '' : 'ghost'}`}
+                      title="The manager uses the default when it does not pick someone"
+                      onClick={() => patch({ defaultCrewId: c.id })}
+                    >
+                      <Star size={13} fill={isDefault ? 'currentColor' : 'none'} />
+                      {isDefault ? 'Default' : 'Set default'}
+                    </button>
+                    <button
+                      className={`btn sm ${isCleared ? '' : 'ghost'}`}
+                      aria-pressed={isCleared}
+                      title={
+                        isCleared
+                          ? 'Can be given tasks in private projects and can open your email and calendar. Click to withdraw.'
+                          : 'Never given tasks in private projects, and cannot open your email or calendar. Click to allow.'
+                      }
+                      onClick={() => patchCrew(c.id, { trusted: !isCleared })}
+                    >
+                      {isCleared ? <Lock size={13} /> : <LockOpen size={13} />}
+                      {isCleared ? 'Private: yes' : 'Private: no'}
+                    </button>
+                  </div>
                   <button
                     className="icon-btn"
                     aria-label={`Remove ${c.name}`}
